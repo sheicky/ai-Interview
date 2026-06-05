@@ -1,66 +1,132 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useState, type FormEvent } from "react";
 
 export default function Home() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ id: string; scraped: boolean } | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        body: new FormData(e.currentTarget),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong.");
+        return;
+      }
+      setResult({ id: data.session_id, scraped: data.company_scraped });
+    } catch {
+      setError("Network error — is the server running?");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main style={styles.main}>
+      <div style={styles.card}>
+        <h1 style={styles.h1}>Practice your interview</h1>
+        <p style={styles.sub}>
+          Drop in your CV and the job, and an AI interviewer will talk you through a
+          real, role-specific interview — then hand you a report.
+        </p>
+
+        <form onSubmit={onSubmit} style={styles.form}>
+          <label style={styles.label}>
+            Your CV (PDF)
+            <input name="cv" type="file" accept="application/pdf" required style={styles.input} />
+          </label>
+
+          <label style={styles.label}>
+            Job description
+            <textarea
+              name="jd"
+              required
+              rows={6}
+              placeholder="Paste the full job description here…"
+              style={{ ...styles.input, resize: "vertical" }}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          </label>
+
+          <div style={styles.row}>
+            <label style={{ ...styles.label, flex: 1 }}>
+              Company
+              <input name="company" type="text" required placeholder="Acme Inc." style={styles.input} />
+            </label>
+            <label style={{ ...styles.label, flex: 1 }}>
+              Company website (optional)
+              <input name="companyUrl" type="url" placeholder="https://acme.com" style={styles.input} />
+            </label>
+          </div>
+
+          <button type="submit" disabled={busy} style={{ ...styles.button, opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Preparing your interview…" : "Start interview"}
+          </button>
+        </form>
+
+        {error && <p style={styles.error}>{error}</p>}
+        {result && (
+          <div style={styles.ok}>
+            <strong>Session ready.</strong> id <code>{result.id}</code>
+            {result.scraped ? " · company page indexed" : " · company name only"}
+            <div style={styles.note}>(The voice interview screen wires up next.)</div>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  main: {
+    minHeight: "100vh",
+    display: "grid",
+    placeItems: "center",
+    padding: 24,
+    background: "#fafafa",
+    color: "#1a1a1a",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 560,
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 20,
+    padding: 32,
+  },
+  h1: { fontSize: 26, margin: "0 0 6px" },
+  sub: { color: "#6b7280", fontSize: 15, lineHeight: 1.5, margin: "0 0 24px" },
+  form: { display: "flex", flexDirection: "column", gap: 16 },
+  label: { display: "flex", flexDirection: "column", gap: 6, fontSize: 14, fontWeight: 600 },
+  row: { display: "flex", gap: 16, flexWrap: "wrap" },
+  input: {
+    fontSize: 15,
+    fontWeight: 400,
+    padding: "10px 12px",
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    fontFamily: "inherit",
+  },
+  button: {
+    marginTop: 8,
+    background: "#2563eb",
+    color: "#fff",
+    border: "none",
+    fontSize: 16,
+    fontWeight: 600,
+    padding: "14px 20px",
+    borderRadius: 999,
+    cursor: "pointer",
+  },
+  error: { color: "#dc2626", fontSize: 14, marginTop: 16 },
+  ok: { background: "#eef2ff", borderRadius: 12, padding: 16, marginTop: 16, fontSize: 14 },
+  note: { color: "#6b7280", marginTop: 6, fontSize: 13 },
+};
