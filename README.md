@@ -52,6 +52,11 @@ must already exist.
   OpenRouter call, strict JSON), caches it in the `reports` table, and returns it.
   `?force=1` regenerates. `GET /api/report?session_id=…` returns the stored report.
   Session-scoped (valid `session_id`), no auth.
+- **`app/admin/page.tsx`** — `/admin`, a read-only aggregate metrics dashboard
+  (server component reading SQLite directly). Shows total interviews, completion
+  rate, average overall + per-area scores, score-band distribution, top companies,
+  and recent sessions. **No auth — publicly viewable** (an env-password gate can be
+  added later).
 
 ### Data + retrieval layer
 
@@ -120,6 +125,8 @@ The report is generated once and cached; add `?force=1` to regenerate, or
   seeds a session + transcript, POSTs `/api/report`, and asserts a valid fixed-shape
   report (plus cache + `?force` + empty-transcript→422). Requires `OPENROUTER_*` and
   `PINECONE_*` in `.env`.
+- `npm run check:metrics` — deterministic unit checks for the admin metrics
+  aggregator (`computeMetrics`). No DB or network required.
 
 ## Deferred work
 
