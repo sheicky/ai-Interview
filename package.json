@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "check:isolation": "node --env-file=.env --import tsx scripts/rag-smoke.ts",
-    "check:brain": "node --env-file=.env --import tsx scripts/llm-smoke.ts"
+    "check:brain": "node --env-file=.env --import tsx scripts/llm-smoke.ts",
+    "check:report": "node --env-file=.env --import tsx scripts/report-smoke.ts"
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^7.2.0",
