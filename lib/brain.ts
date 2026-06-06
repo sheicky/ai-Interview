@@ -93,9 +93,9 @@ export async function interviewTurnResponse(opts: {
           /* already closed or errored */
         }
         try {
-          if (userText) addTurn({ sessionId, role: "user", text: userText });
+          if (userText) await addTurn({ sessionId, role: "user", text: userText });
           if (reply) {
-            addTurn({ sessionId, role: "assistant", text: reply, phase, latencyMs: ttft ?? undefined });
+            await addTurn({ sessionId, role: "assistant", text: reply, phase, latencyMs: ttft ?? undefined });
           }
         } catch (logErr) {
           console.error("[brain] turn logging failed:", logErr);

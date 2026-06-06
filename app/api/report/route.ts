@@ -11,7 +11,7 @@
  */
 import type { NextRequest } from "next/server";
 import { retrieve } from "@/lib/rag";
-import { getSession, getTurns, getReport, saveReport } from "@/lib/db";
+import { getSession, getTurns, getReport, saveReport, type TurnRow } from "@/lib/db";
 import { complete } from "@/lib/llm";
 import { buildReportPrompt, parseReport, type Report } from "@/lib/report";
 import type { Msg } from "@/lib/interviewer";
@@ -35,16 +35,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     return Response.json({ error: "missing or invalid session_id" }, { status: 400 });
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return Response.json({ error: "unknown session" }, { status: 404 });
 
   const force = url.searchParams.get("force") === "1" || body.force === true;
   if (!force) {
-    const existing = getReport(sessionId);
+    const existing = await getReport(sessionId);
     if (existing) return Response.json(JSON.parse(existing.json));
   }
 
-  const turns = getTurns(sessionId);
+  const turns = await getTurns(sessionId);
   if (transcriptIsEmpty(turns)) {
     return Response.json({ error: "no interview to report on" }, { status: 422 });
   }
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // Don't lose a just-generated (paid-for) report if the cache write fails.
   try {
-    saveReport(sessionId, JSON.stringify(report));
+    await saveReport(sessionId, JSON.stringify(report));
   } catch (err) {
     console.error("[/report] saveReport failed:", err);
   }
@@ -91,13 +91,13 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!UUID_RE.test(sessionId)) {
     return Response.json({ error: "missing or invalid session_id" }, { status: 400 });
   }
-  const row = getReport(sessionId);
+  const row = await getReport(sessionId);
   if (!row) return Response.json({ error: "no report" }, { status: 404 });
   return Response.json(JSON.parse(row.json));
 }
 
 /** A transcript with no non-empty user/assistant text can't be reported on. */
-function transcriptIsEmpty(turns: ReturnType<typeof getTurns>): boolean {
+function transcriptIsEmpty(turns: TurnRow[]): boolean {
   return !turns.some(
     (t) => (t.role === "user" || t.role === "assistant") && t.text && t.text.trim(),
   );

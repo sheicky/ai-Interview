@@ -52,7 +52,7 @@ export default async function ReportPage({
     );
   }
 
-  const row = getReport(sessionId);
+  const row = await getReport(sessionId);
   if (!row) {
     return (
       <main style={page}>

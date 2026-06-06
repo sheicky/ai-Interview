@@ -96,9 +96,9 @@ export function computeMetrics(input: {
 }
 
 /** Read the DB and compute metrics. Skips any report row with malformed JSON. */
-export function getMetrics(): Metrics {
+export async function getMetrics(): Promise<Metrics> {
   const reports: { session_id: string; report: Report }[] = [];
-  for (const row of getAllReports()) {
+  for (const row of await getAllReports()) {
     try {
       reports.push({ session_id: row.session_id, report: JSON.parse(row.json) as Report });
     } catch (err) {
@@ -106,8 +106,8 @@ export function getMetrics(): Metrics {
     }
   }
   return computeMetrics({
-    sessions: getAllSessions(),
+    sessions: await getAllSessions(),
     reports,
-    candidateTurnCounts: getCandidateTurnCounts(),
+    candidateTurnCounts: await getCandidateTurnCounts(),
   });
 }

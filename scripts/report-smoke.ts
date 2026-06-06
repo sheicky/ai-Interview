@@ -48,15 +48,15 @@ async function main() {
   const sid = randomUUID();
   const emptySid = randomUUID();
   try {
-    createSession({ id: sid, company: "Acme Corp", companyUrl: "https://acme.example" });
+    await createSession({ id: sid, company: "Acme Corp", companyUrl: "https://acme.example" });
     await addSessionDocs(sid, [
       { kind: "cv", text: "Jane Doe led the billing rewrite at Acme; 8 years backend, payments." },
       { kind: "jd", text: "Senior backend engineer for the billing platform; payments + scaling." },
     ]);
-    addTurn({ sessionId: sid, role: "assistant", text: "Walk me through the billing rewrite you led." });
-    addTurn({ sessionId: sid, role: "user", text: "I split the monolith's billing into a service, introduced idempotency keys, and cut failed charges by 30%." });
-    addTurn({ sessionId: sid, role: "assistant", text: "How did you handle retries safely?" });
-    addTurn({ sessionId: sid, role: "user", text: "Idempotency keys plus an outbox so retries never double-charge." });
+    await addTurn({ sessionId: sid, role: "assistant", text: "Walk me through the billing rewrite you led." });
+    await addTurn({ sessionId: sid, role: "user", text: "I split the monolith's billing into a service, introduced idempotency keys, and cut failed charges by 30%." });
+    await addTurn({ sessionId: sid, role: "assistant", text: "How did you handle retries safely?" });
+    await addTurn({ sessionId: sid, role: "user", text: "Idempotency keys plus an outbox so retries never double-charge." });
 
     const res = await POST(reportReq(sid));
     assert.equal(res.status, 200, `expected 200, got ${res.status}`);
@@ -84,7 +84,7 @@ async function main() {
     ok("?force=1 regenerates");
 
     // Empty transcript → 422.
-    createSession({ id: emptySid, company: "Empty Co" });
+    await createSession({ id: emptySid, company: "Empty Co" });
     assert.equal((await POST(reportReq(emptySid))).status, 422, "empty transcript → 422");
     ok("empty transcript is rejected (422)");
 
@@ -92,8 +92,8 @@ async function main() {
   } finally {
     await deleteSessionDocs(sid).catch(() => {});
     for (const id of [sid, emptySid]) {
-      try { deleteReport(id); } catch { /* best-effort */ }
-      try { deleteSession(id); } catch { /* best-effort */ }
+      try { await deleteReport(id); } catch { /* best-effort */ }
+      try { await deleteSession(id); } catch { /* best-effort */ }
     }
   }
 }
