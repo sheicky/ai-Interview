@@ -3,8 +3,9 @@
 A web app where you drop in your CV and a job description, and an AI interviewer
 runs a real, role-specific interview, then hands you a report. This branch ships
 the **intake** half (the form, the session API, and the session-scoped retrieval
-layer) and the **interview brain** (the streaming LLM endpoint the interviewer
-speaks through).
+layer), the **interview brain** (the streaming LLM endpoint the interviewer
+speaks through), and the **text interview UI** — the live interview screen and
+the post-interview report view. Voice is a later slice.
 
 > Built on a non-standard build of Next.js. Before changing app or API code, read
 > the relevant guide in `node_modules/next/dist/docs/` — APIs and conventions may
@@ -57,6 +58,14 @@ must already exist.
   rate, average overall + per-area scores, score-band distribution, top companies,
   and recent sessions. **No auth — publicly viewable** (an env-password gate can be
   added later).
+- **`app/interview/[sessionId]/page.tsx`** — the text-mode interview screen
+  (client). The interviewer greets first, then streams replies from `/api/chat`;
+  "End interview" generates the report and navigates to `/report/[sessionId]`.
+- **`app/report/[sessionId]/page.tsx`** — server-rendered view of the stored
+  report (overall + per-area scores, strengths/gaps/next steps).
+- **`app/api/chat/route.ts`** — browser-facing turn endpoint. Session-scoped, no
+  shared secret; shares the brain core (`lib/brain.ts`) with `/api/llm` and returns
+  the same OpenAI SSE.
 
 ### Data + retrieval layer
 
@@ -127,6 +136,9 @@ The report is generated once and cached; add `?force=1` to regenerate, or
   `PINECONE_*` in `.env`.
 - `npm run check:metrics` — deterministic unit checks for the admin metrics
   aggregator (`computeMetrics`). No DB or network required.
+- `npm run check:chat` — real round-trip for `/api/chat` (`scripts/chat-smoke.ts`):
+  seeds a session, asserts a streamed reply plus 400/404 guards. Requires
+  `OPENROUTER_*` and `PINECONE_*` in `.env`.
 
 ## Deferred work
 
