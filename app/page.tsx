@@ -17,9 +17,11 @@ export default function Home() {
         method: "POST",
         body: new FormData(e.currentTarget),
       });
-      const data = await res.json();
+      // The server may return a non-JSON body on an unexpected failure
+      // (framework 500, gateway error) — don't let res.json() throw.
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong.");
+        setError(data.error ?? `Something went wrong (${res.status}).`);
         return;
       }
       setResult({ id: data.session_id, scraped: data.company_scraped });
@@ -67,12 +69,24 @@ export default function Home() {
             </label>
           </div>
 
-          <button type="submit" disabled={busy} style={{ ...styles.button, opacity: busy ? 0.6 : 1 }}>
+          <button
+            type="submit"
+            disabled={busy}
+            style={{
+              ...styles.button,
+              opacity: busy ? 0.6 : 1,
+              cursor: busy ? "not-allowed" : "pointer",
+            }}
+          >
             {busy ? "Preparing your interview…" : "Start interview"}
           </button>
         </form>
 
-        {error && <p style={styles.error}>{error}</p>}
+        {error && (
+          <p role="alert" style={styles.error}>
+            {error}
+          </p>
+        )}
         {result && (
           <div style={styles.ok}>
             <strong>Session ready.</strong> id <code>{result.id}</code>
