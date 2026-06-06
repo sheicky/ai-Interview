@@ -11,7 +11,7 @@ export interface AreaScore {
 }
 
 export interface Report {
-  overall: { score: number; band: string; verdict: string };
+  overall: { score: number; band: "strong" | "mixed" | "weak"; verdict: string };
   areas: {
     technical: AreaScore;
     communication: AreaScore;
@@ -96,6 +96,12 @@ function asStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.map((x) => String(x)) : [];
 }
 
+function normalizeBand(raw: unknown, score: number): "strong" | "mixed" | "weak" {
+  const b = String(raw ?? "").trim().toLowerCase();
+  if (b === "strong" || b === "mixed" || b === "weak") return b;
+  return score >= 70 ? "strong" : score >= 40 ? "mixed" : "weak";
+}
+
 /** Strip code fences, JSON.parse, and validate/normalize the fixed shape. Throws on structural failure. */
 export function parseReport(text: string, hasCompanyUrl: boolean): Report {
   let jsonText = text.trim();
@@ -115,10 +121,11 @@ export function parseReport(text: string, hasCompanyUrl: boolean): Report {
   const companyFit =
     !hasCompanyUrl || areas.company_fit == null ? null : parseArea(areas.company_fit);
 
+  const overallScore = clampScore(overall.score);
   return {
     overall: {
-      score: clampScore(overall.score),
-      band: String(overall.band ?? ""),
+      score: overallScore,
+      band: normalizeBand(overall.band, overallScore),
       verdict: String(overall.verdict ?? ""),
     },
     areas: {
