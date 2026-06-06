@@ -6,13 +6,13 @@
  *   2. parse the CV PDF → text
  *   3. scrape the company URL → text (best-effort, optional)
  *   4. create the session row (SQLite)
- *   5. embed [CV, JD, company] into LanceDB tagged with session_id
+ *   5. index [CV, JD, company] into the session's Pinecone namespace
  * returns { session_id, company_scraped }
  */
 import type { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import { createSession } from "@/lib/db";
-import { addSessionDocs } from "@/lib/rag";
+import { createSession, deleteSession } from "@/lib/db";
+import { addSessionDocs, deleteSessionDocs } from "@/lib/rag";
 import { parseCvPdf } from "@/lib/cv";
 import { scrapeCompany } from "@/lib/scrape";
 
@@ -20,9 +20,15 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_CV_BYTES = 5 * 1024 * 1024;
+const MAX_CV_MB = MAX_CV_BYTES / 1024 / 1024;
 
 export async function POST(req: NextRequest): Promise<Response> {
-  const form = await req.formData();
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return Response.json({ error: "Invalid form submission." }, { status: 400 });
+  }
   const cv = form.get("cv");
   const jd = String(form.get("jd") ?? "").trim();
   const company = String(form.get("company") ?? "").trim();
@@ -31,7 +37,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!(cv instanceof File) || cv.size === 0)
     return Response.json({ error: "Please attach your CV (PDF)." }, { status: 400 });
   if (cv.size > MAX_CV_BYTES)
-    return Response.json({ error: "CV must be under 5MB." }, { status: 413 });
+    return Response.json({ error: `CV must be under ${MAX_CV_MB}MB.` }, { status: 413 });
   if (!jd) return Response.json({ error: "Please paste the job description." }, { status: 400 });
   if (!company) return Response.json({ error: "Please enter the company name." }, { status: 400 });
 
@@ -57,13 +63,31 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const sessionId = randomUUID();
-  createSession({ id: sessionId, company, companyUrl: companyUrl || undefined });
-
-  await addSessionDocs(sessionId, [
-    { kind: "cv", text: cvText },
-    { kind: "jd", text: jd },
-    ...(companyText ? [{ kind: "company", text: companyText }] : []),
-  ]);
+  try {
+    createSession({ id: sessionId, company, companyUrl: companyUrl || undefined });
+    await addSessionDocs(sessionId, [
+      { kind: "cv", text: cvText },
+      { kind: "jd", text: jd },
+      ...(companyText ? [{ kind: "company", text: companyText }] : []),
+    ]);
+  } catch {
+    // Indexing failed after the row was written (e.g. embedding model load).
+    // Roll back both stores so we never leave an orphaned, doc-less session.
+    try {
+      await deleteSessionDocs(sessionId);
+    } catch {
+      /* best-effort cleanup */
+    }
+    try {
+      deleteSession(sessionId);
+    } catch {
+      /* best-effort cleanup */
+    }
+    return Response.json(
+      { error: "Could not prepare your interview. Please try again." },
+      { status: 500 },
+    );
+  }
 
   return Response.json({ session_id: sessionId, company_scraped: Boolean(companyText) });
 }
