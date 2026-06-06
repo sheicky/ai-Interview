@@ -2,8 +2,9 @@
 
 A web app where you drop in your CV and a job description, and an AI interviewer
 runs a real, role-specific interview, then hands you a report. This branch ships
-the **intake** half: the form, the session API, and the session-scoped retrieval
-layer that the interview will later read from.
+the **intake** half (the form, the session API, and the session-scoped retrieval
+layer) and the **interview brain** (the streaming LLM endpoint the interviewer
+speaks through).
 
 > Built on a non-standard build of Next.js. Before changing app or API code, read
 > the relevant guide in `node_modules/next/dist/docs/` — APIs and conventions may
@@ -39,6 +40,13 @@ must already exist.
   Returns `{ session_id, company_scraped }`. If indexing fails after the row is
   written, it rolls back both stores so no orphaned, doc-less session is left
   behind. CVs are capped at 5MB.
+- **`app/api/llm/route.ts`** — `POST /api/llm`, the interview brain.
+  OpenAI-compatible (for ElevenLabs' custom LLM), authenticated by
+  `X-Shared-Secret`. Resolves `session_id` from the request extra-body,
+  retrieves that session's CV/JD/company docs from Pinecone, builds an
+  interviewer system prompt (retrieved text fenced as untrusted reference data),
+  and streams the reply from OpenRouter while logging each turn. `GET` is a
+  health check.
 
 ### Data + retrieval layer
 
@@ -62,6 +70,20 @@ must already exist.
 - **`lib/paths.ts`** — single source of truth for the on-disk `DATA_DIR` (the
   SQLite root). Vector storage now lives in Pinecone, not on disk.
 
+### Interview brain
+
+The brain speaks the OpenAI chat/completions wire protocol so ElevenLabs'
+custom LLM can point directly at `/api/llm` without any adapter. The model is
+chosen via `OPENROUTER_MODEL` (any slug from
+[openrouter.ai/models](https://openrouter.ai/models)).
+
+```bash
+curl -N http://localhost:3000/api/llm \
+  -H "content-type: application/json" \
+  -H "x-shared-secret: $SHARED_SECRET" \
+  -d '{"session_id":"<a-real-session-uuid>","messages":[{"role":"user","content":"Hi"}]}'
+```
+
 ## Scripts
 
 - `npm run dev` — start the dev server.
@@ -73,6 +95,11 @@ must already exist.
   one with a prompt that pulls semantically toward the other's content, and
   asserts it only ever sees its own docs; then deletes a session and asserts its
   namespace is empty. Requires `PINECONE_API_KEY` / `PINECONE_INDEX` in `.env`.
+- `npm run check:brain` — real round-trip for the interview brain
+  (`scripts/llm-smoke.ts`): seeds a throwaway session, POSTs an OpenAI-format
+  request to `/api/llm`, and asserts a non-empty streamed interviewer reply.
+  Requires `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `PINECONE_*`, and
+  `SHARED_SECRET` in `.env`.
 
 ## Deferred work
 
