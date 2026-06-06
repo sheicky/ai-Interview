@@ -137,4 +137,22 @@ export function deleteReport(sessionId: string): void {
   db.prepare(`DELETE FROM reports WHERE session_id = ?`).run(sessionId);
 }
 
+/** All sessions, newest first. */
+export function getAllSessions(): SessionRow[] {
+  return db.prepare(`SELECT * FROM sessions ORDER BY created_at DESC`).all() as SessionRow[];
+}
+
+/** All stored reports. */
+export function getAllReports(): ReportRow[] {
+  return db.prepare(`SELECT * FROM reports`).all() as ReportRow[];
+}
+
+/** Per-session count of candidate (role='user') turns — a proxy for interview length. */
+export function getCandidateTurnCounts(): number[] {
+  const rows = db
+    .prepare(`SELECT COUNT(*) AS n FROM turns WHERE role = 'user' GROUP BY session_id`)
+    .all() as { n: number }[];
+  return rows.map((r) => r.n);
+}
+
 export default db;
