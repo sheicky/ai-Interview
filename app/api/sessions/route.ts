@@ -6,7 +6,7 @@
  *   2. parse the CV PDF → text
  *   3. scrape the company URL → text (best-effort, optional)
  *   4. create the session row (SQLite)
- *   5. embed [CV, JD, company] into LanceDB tagged with session_id
+ *   5. index [CV, JD, company] into the session's Pinecone namespace
  * returns { session_id, company_scraped }
  */
 import type { NextRequest } from "next/server";

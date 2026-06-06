@@ -38,7 +38,11 @@ async function main() {
       { kind: "cv", text: "John Smith is a marine biologist studying coral reefs." },
     ]);
 
-    const hitsA = await retryRetrieve("payments billing experience", sidA);
+    // Adversarial: query session A with a prompt that pulls semantically toward
+    // session B's content. Namespace isolation must still return only A's own
+    // docs and never B's "coral" text.
+    const adversarial = "coral reef marine biology research";
+    const hitsA = await retryRetrieve(adversarial, sidA);
     assert.ok(hitsA.length > 0, "session A should return its own docs");
     assert.ok(
       hitsA.every((h) => !h.text.toLowerCase().includes("coral")),
@@ -48,10 +52,10 @@ async function main() {
 
     await deleteSessionDocs(sidA);
     // Deletion is also eventually consistent; poll until the namespace clears.
-    let afterDelete = await retrieve("payments billing experience", sidA);
+    let afterDelete = await retrieve(adversarial, sidA);
     for (let i = 0; i < 12 && afterDelete.length > 0; i++) {
       await new Promise((r) => setTimeout(r, 1500));
-      afterDelete = await retrieve("payments billing experience", sidA);
+      afterDelete = await retrieve(adversarial, sidA);
     }
     assert.equal(afterDelete.length, 0, "deleted session should return nothing");
     ok("deleteSessionDocs() clears the namespace");
