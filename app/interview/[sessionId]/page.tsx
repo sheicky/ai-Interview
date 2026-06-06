@@ -1,106 +1,68 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useParams, useRouter } from "next/navigation";
-
-interface Msg {
-  role: "user" | "assistant";
-  content: string;
-}
-
-/** Extract delta content from one OpenAI-SSE `data:` line ("" if not a content line). */
-function parseSseLine(line: string): string {
-  if (!line.startsWith("data: ")) return "";
-  const payload = line.slice(6).trim();
-  if (payload === "[DONE]") return "";
-  try {
-    return JSON.parse(payload).choices?.[0]?.delta?.content ?? "";
-  } catch {
-    return "";
-  }
-}
+import { useEffect, useRef, useState } from "react";
 
 export default function InterviewPage() {
+  return (
+    <ConversationProvider>
+      <VoiceInterview />
+    </ConversationProvider>
+  );
+}
+
+type Phase = "idle" | "connecting" | "live" | "ending";
+
+function VoiceInterview() {
   const params = useParams<{ sessionId: string }>();
   const sessionId = params.sessionId;
   const router = useRouter();
 
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [streaming, setStreaming] = useState("");
-  const [status, setStatus] = useState<"idle" | "streaming" | "ending">("idle");
-  const [input, setInput] = useState("");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [caption, setCaption] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const kicked = useRef(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streaming]);
 
-  /** POST the conversation to /api/chat and stream the assistant reply. */
-  async function streamChat(outgoing: Msg[]) {
-    setStatus("streaming");
-    setStreaming("");
+  const conversation = useConversation({
+    onMessage: ({ message, source }) => {
+      // Captions only for the interviewer (agent) — ignore user transcriptions.
+      if (source !== "user") setCaption(message);
+    },
+    onError: () => setError("Connection error. Please try again."),
+  });
+
+  const { status, isSpeaking, isMuted, setMuted } = conversation;
+
+  async function start() {
     setError(null);
-    let acc = "";
+    setPhase("connecting");
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, messages: outgoing }),
-      });
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? `Something went wrong (${res.status}).`);
-        setStatus("idle");
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const res = await fetch("/api/elevenlabs/token");
+      if (!res.ok) {
+        setError("Couldn't start the interview. Check the server configuration.");
+        setPhase("idle");
         return;
       }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          acc += parseSseLine(line);
-        }
-        setStreaming(acc);
-      }
-      buf += decoder.decode(); // flush any trailing multi-byte char
-      acc += parseSseLine(buf);
-      if (acc) setMessages((m) => [...m, { role: "assistant", content: acc }]);
-      setStreaming("");
-      setStatus("idle");
+      const { token } = (await res.json()) as { token: string };
+      await conversation.startSession({
+        conversationToken: token,
+        dynamicVariables: { session_id: sessionId },
+      });
+      setPhase("live");
     } catch {
-      setError("Network error — is the server running?");
-      setStatus("idle");
+      setError("Microphone access is required to start the interview.");
+      setPhase("idle");
     }
   }
 
-  // Interviewer greets first: one kickoff with empty history (ref-guarded so
-  // React strict-mode's double-mount doesn't double-send).
-  useEffect(() => {
-    if (kicked.current) return;
-    kicked.current = true;
-    void streamChat([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function onSend() {
-    const text = input.trim();
-    if (!text || status !== "idle") return;
-    const next: Msg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
-    setInput("");
-    await streamChat(next);
-  }
-
-  async function onEnd() {
-    if (status !== "idle") return;
-    setStatus("ending");
-    setError(null);
+  async function end() {
+    setPhase("ending");
+    try {
+      await conversation.endSession();
+    } catch {
+      /* ignore */
+    }
     try {
       const res = await fetch("/api/report", {
         method: "POST",
@@ -108,83 +70,89 @@ export default function InterviewPage() {
         body: JSON.stringify({ session_id: sessionId }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? `Could not generate report (${res.status}).`);
-        setStatus("idle");
+        setError("Could not generate the report.");
+        setPhase("live");
         return;
       }
       router.push(`/report/${sessionId}`);
     } catch {
-      setError("Network error generating the report.");
-      setStatus("idle");
+      setError("Could not generate the report.");
+      setPhase("live");
     }
   }
 
+  // Orb pulse: drive scale from the agent's output audio level while live.
+  const orbRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (phase !== "live") return;
+    let raf = 0;
+    const tick = () => {
+      let level = 0;
+      const data = conversation.getOutputByteFrequencyData?.();
+      if (data && data.length) {
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        level = sum / data.length / 255;
+      }
+      if (orbRef.current) {
+        orbRef.current.style.transform = `scale(${(1 + level * 0.6).toFixed(3)})`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [phase, conversation]);
+
   return (
     <main style={s.main}>
-      <div style={s.head}>
-        <h1 style={s.h1}>Interview</h1>
-        <button onClick={onEnd} disabled={status !== "idle"} style={s.endBtn}>
-          {status === "ending" ? "Generating report…" : "End interview"}
-        </button>
-      </div>
-
-      <div style={s.transcript}>
-        {messages.map((m, i) => (
-          <div key={i} style={m.role === "user" ? s.userRow : s.aiRow}>
-            <span style={m.role === "user" ? s.userBubble : s.aiBubble}>{m.content}</span>
+      {phase === "idle" || phase === "connecting" ? (
+        <div style={s.center}>
+          <h1 style={s.h1}>Your interview</h1>
+          <p style={s.sub}>You&apos;ll speak with an AI interviewer. Find a quiet spot.</p>
+          <button onClick={start} disabled={phase === "connecting"} style={s.startBtn}>
+            {phase === "connecting" ? "Connecting…" : "Start interview"}
+          </button>
+          {error && <p role="alert" style={s.error}>{error}</p>}
+        </div>
+      ) : (
+        <div style={s.center}>
+          <div style={s.orbWrap}>
+            <div
+              ref={orbRef}
+              style={{ ...s.orb, background: isSpeaking ? "#2563eb" : "#93c5fd" }}
+            />
           </div>
-        ))}
-        {streaming && (
-          <div style={s.aiRow}>
-            <span style={s.aiBubble}>{streaming}</span>
+          <p style={s.state}>
+            {status !== "connected" ? "Connecting…" : isSpeaking ? "Interviewer speaking…" : "Listening…"}
+          </p>
+          <p style={s.caption}>{isSpeaking ? caption : ""}</p>
+          <div style={s.controls}>
+            <button onClick={() => setMuted(!isMuted)} style={s.muteBtn}>
+              {isMuted ? "Unmute" : "Mute"}
+            </button>
+            <button onClick={end} disabled={phase === "ending"} style={s.endBtn}>
+              {phase === "ending" ? "Generating report…" : "End interview"}
+            </button>
           </div>
-        )}
-        {status === "streaming" && !streaming && <p style={s.thinking}>…</p>}
-        <div ref={bottomRef} />
-      </div>
-
-      {error && (
-        <p role="alert" style={s.error}>
-          {error}
-        </p>
+          {error && <p role="alert" style={s.error}>{error}</p>}
+        </div>
       )}
-
-      <form
-        style={s.form}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void onSend();
-        }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your answer…"
-          disabled={status !== "idle"}
-          style={s.input}
-        />
-        <button type="submit" disabled={status !== "idle" || !input.trim()} style={s.sendBtn}>
-          Send
-        </button>
-      </form>
     </main>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
-  main: { maxWidth: 720, margin: "0 auto", padding: 24, fontFamily: "system-ui, sans-serif", color: "#1a1a1a", display: "flex", flexDirection: "column", minHeight: "100vh" },
-  head: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  h1: { fontSize: 22, margin: 0 },
-  endBtn: { background: "#ef4444", color: "#fff", border: "none", borderRadius: 999, padding: "8px 16px", fontWeight: 600, cursor: "pointer" },
-  transcript: { flex: 1, display: "flex", flexDirection: "column", gap: 10, margin: "16px 0", overflowY: "auto" },
-  userRow: { display: "flex", justifyContent: "flex-end" },
-  aiRow: { display: "flex", justifyContent: "flex-start" },
-  userBubble: { background: "#2563eb", color: "#fff", borderRadius: 14, padding: "8px 12px", maxWidth: "80%", whiteSpace: "pre-wrap" },
-  aiBubble: { background: "#f1f5f9", color: "#1a1a1a", borderRadius: 14, padding: "8px 12px", maxWidth: "80%", whiteSpace: "pre-wrap" },
-  thinking: { color: "#94a3b8" },
+  main: { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "system-ui, sans-serif", color: "#1a1a1a", background: "#fafafa" },
+  center: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 560 },
+  h1: { fontSize: 26, margin: 0 },
+  sub: { color: "#6b7280", margin: 0 },
+  startBtn: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 999, padding: "14px 28px", fontSize: 16, fontWeight: 600, cursor: "pointer" },
+  orbWrap: { height: 220, display: "grid", placeItems: "center" },
+  orb: { width: 140, height: 140, borderRadius: "50%", transition: "background 0.2s ease", boxShadow: "0 12px 40px rgba(37,99,235,0.35)" },
+  state: { color: "#6b7280", margin: 0, fontSize: 14 },
+  caption: { minHeight: 48, fontSize: 18, lineHeight: 1.4, margin: 0, maxWidth: 520 },
+  controls: { display: "flex", gap: 12, marginTop: 8 },
+  muteBtn: { background: "#e5e7eb", color: "#1a1a1a", border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer" },
+  endBtn: { background: "#ef4444", color: "#fff", border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer" },
   error: { color: "#dc2626", fontSize: 14 },
-  form: { display: "flex", gap: 8, position: "sticky", bottom: 0, background: "#fff", paddingTop: 8 },
-  input: { flex: 1, fontSize: 15, padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 10, fontFamily: "inherit" },
-  sendBtn: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontWeight: 600, cursor: "pointer" },
 };

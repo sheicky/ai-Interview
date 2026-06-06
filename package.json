@@ -11,9 +11,11 @@
     "check:brain": "node --env-file=.env --import tsx scripts/llm-smoke.ts",
     "check:report": "node --env-file=.env --import tsx scripts/report-smoke.ts",
     "check:metrics": "node --import tsx scripts/metrics-smoke.ts",
-    "check:chat": "node --env-file=.env --import tsx scripts/chat-smoke.ts"
+    "check:chat": "node --env-file=.env --import tsx scripts/chat-smoke.ts",
+    "check:token": "node --import tsx scripts/elevenlabs-token-smoke.ts"
   },
   "dependencies": {
+    "@elevenlabs/react": "^1.6.4",
     "@libsql/client": "^0.17.3",
     "@pinecone-database/pinecone": "^7.2.0",
     "next": "16.2.7",
