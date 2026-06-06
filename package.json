@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:isolation": "node --env-file=.env --import tsx scripts/rag-smoke.ts"
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^7.2.0",
