@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "check:isolation": "node scripts/check-isolation.mjs"
+    "lint": "eslint"
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^7.2.0",

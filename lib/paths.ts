@@ -1,6 +1,3 @@
-/** Shared on-disk locations for the SQLite DB and LanceDB. Single source of truth
- *  so db.ts and rag.ts can never drift onto different roots. */
-import { join } from "node:path";
-
+/** Shared on-disk location for the SQLite DB. Single source of truth so db.ts
+ *  uses one root. (Vector storage now lives in Pinecone, not on disk.) */
 export const DATA_DIR = process.env.DATA_DIR ?? ".data";
-export const LANCE_DIR = join(DATA_DIR, "lancedb");
