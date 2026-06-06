@@ -41,3 +41,15 @@ export async function streamReply(
     { signal },
   );
 }
+
+/** One-shot (non-streaming) chat completion; returns the assistant text. */
+export async function complete(
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+): Promise<string> {
+  const res = await getClient().chat.completions.create({
+    model: MODEL,
+    messages,
+    stream: false,
+  });
+  return res.choices[0]?.message?.content ?? "";
+}

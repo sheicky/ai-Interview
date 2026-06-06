@@ -47,6 +47,11 @@ must already exist.
   interviewer system prompt (retrieved text fenced as untrusted reference data),
   and streams the reply from OpenRouter while logging each turn. `GET` is a
   health check.
+- **`app/api/report/route.ts`** — `POST /api/report` generates a fixed-rubric
+  interview report from the logged transcript + retrieved CV/JD context (one
+  OpenRouter call, strict JSON), caches it in the `reports` table, and returns it.
+  `?force=1` regenerates. `GET /api/report?session_id=…` returns the stored report.
+  Session-scoped (valid `session_id`), no auth.
 
 ### Data + retrieval layer
 
@@ -84,6 +89,17 @@ curl -N http://localhost:3000/api/llm \
   -d '{"session_id":"<a-real-session-uuid>","messages":[{"role":"user","content":"Hi"}]}'
 ```
 
+Once the interview is done, generate the report:
+
+```bash
+curl -X POST "http://localhost:3000/api/report" \
+  -H "content-type: application/json" \
+  -d '{"session_id":"<a-real-session-uuid>"}'
+```
+
+The report is generated once and cached; add `?force=1` to regenerate, or
+`GET /api/report?session_id=…` to fetch the stored one.
+
 ## Scripts
 
 - `npm run dev` — start the dev server.
@@ -100,6 +116,10 @@ curl -N http://localhost:3000/api/llm \
   request to `/api/llm`, and asserts a non-empty streamed interviewer reply.
   Requires `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `PINECONE_*`, and
   `SHARED_SECRET` in `.env`.
+- `npm run check:report` — real round-trip for the report (`scripts/report-smoke.ts`):
+  seeds a session + transcript, POSTs `/api/report`, and asserts a valid fixed-shape
+  report (plus cache + `?force` + empty-transcript→422). Requires `OPENROUTER_*` and
+  `PINECONE_*` in `.env`.
 
 ## Deferred work
 

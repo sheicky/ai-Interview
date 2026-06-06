@@ -95,4 +95,46 @@ export function addTurn(t: {
   );
 }
 
+export interface TurnRow {
+  id: number;
+  session_id: string;
+  ts: string;
+  role: string;
+  text: string;
+  phase: string | null;
+  latency_ms: number | null;
+}
+
+/** All turns for a session, oldest first. */
+export function getTurns(sessionId: string): TurnRow[] {
+  return db
+    .prepare(`SELECT * FROM turns WHERE session_id = ? ORDER BY id ASC`)
+    .all(sessionId) as TurnRow[];
+}
+
+export interface ReportRow {
+  session_id: string;
+  created_at: string;
+  json: string;
+}
+
+/** Fetch a stored report (undefined if none). */
+export function getReport(sessionId: string): ReportRow | undefined {
+  return db.prepare(`SELECT * FROM reports WHERE session_id = ?`).get(sessionId) as
+    | ReportRow
+    | undefined;
+}
+
+/** Upsert a report (one per session). */
+export function saveReport(sessionId: string, json: string): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO reports (session_id, created_at, json) VALUES (?, ?, ?)`,
+  ).run(sessionId, new Date().toISOString(), json);
+}
+
+/** Remove a session's report (used in test cleanup). */
+export function deleteReport(sessionId: string): void {
+  db.prepare(`DELETE FROM reports WHERE session_id = ?`).run(sessionId);
+}
+
 export default db;
