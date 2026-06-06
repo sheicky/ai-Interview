@@ -48,7 +48,7 @@ export function sanitizeHistory(messages: Msg[]): Msg[] {
 }
 
 /** Neutralize the reference fence delimiters so untrusted doc text can't escape it. */
-function stripFence(s: string): string {
+export function stripFence(s: string): string {
   return s.replace(/<\/?\s*reference\s*>/gi, "[reference]");
 }
 
