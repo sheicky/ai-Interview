@@ -58,4 +58,41 @@ export function deleteSession(id: string): void {
   db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
 }
 
+export interface SessionRow {
+  id: string;
+  company: string;
+  company_url: string | null;
+  created_at: string;
+  status: string;
+  ended_at: string | null;
+}
+
+/** Fetch a session row (used to put the company name in the interviewer prompt). */
+export function getSession(id: string): SessionRow | undefined {
+  return db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(id) as
+    | SessionRow
+    | undefined;
+}
+
+/** Append one transcript turn. `latency_ms` is time-to-first-token for assistant turns. */
+export function addTurn(t: {
+  sessionId: string;
+  role: string;
+  text: string;
+  phase?: string;
+  latencyMs?: number;
+}): void {
+  db.prepare(
+    `INSERT INTO turns (session_id, ts, role, text, phase, latency_ms)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    t.sessionId,
+    new Date().toISOString(),
+    t.role,
+    t.text,
+    t.phase ?? null,
+    t.latencyMs ?? null,
+  );
+}
+
 export default db;
