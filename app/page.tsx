@@ -91,7 +91,9 @@ export default function Home() {
           <div style={styles.ok}>
             <strong>Session ready.</strong> id <code>{result.id}</code>
             {result.scraped ? " · company page indexed" : " · company name only"}
-            <div style={styles.note}>(The voice interview screen wires up next.)</div>
+            <div style={styles.note}>
+              <a href={`/interview/${result.id}`}>Start interview →</a>
+            </div>
           </div>
         )}
       </div>
