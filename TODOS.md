@@ -35,38 +35,41 @@ deliberately deferred (the four highest-value fixes — SSRF guard, route
 rollback, idempotent table create, session-id validation — already landed in the
 PR). Listed roughly by priority.
 
-- **[P0] Stand up a test framework + pin the isolation guarantee to production code.**
-  No test runner exists; `scripts/check-isolation.mjs` re-implements the embed +
-  `.where(session_id)` path and never imports `lib/rag.ts`, so a regression in the
-  real `retrieve()`/`escapeSql()` wouldn't be caught. Add vitest and an isolation
-  test that calls the real `addSessionDocs()`/`retrieve()` against a temp `DATA_DIR`.
-  Sequence this with the Pinecone migration so embedding-internal tests aren't thrown away.
+- **[P0] Stand up a real test runner.** Partly addressed by the Pinecone migration:
+  `scripts/rag-smoke.ts` (`npm run check:isolation`) now calls the *real*
+  `addSessionDocs()`/`retrieve()`/`deleteSessionDocs()` and asserts cross-namespace
+  isolation, so a regression in production RAG code is caught. Remaining gap: no
+  unit-test runner (add vitest) and the smoke needs a live Pinecone index + `.env`,
+  so it can't run hermetically in CI. Decide between a CI Pinecone project (or a
+  dedicated test-namespace prefix) vs. mocking the Pinecone client for unit tests.
 - **[P1][security] Close the residual SSRF DNS-rebind.** `lib/scrape.ts` validates the
   resolved IP and re-validates every redirect hop, but `fetch` re-resolves the
   hostname independently, so an attacker-controlled domain with a short TTL can
   rebind to an internal IP between our check and the connect. Pin the connection to
   the validated IP (undici dispatcher / custom `lookup`).
-- **[P1][availability] Move embedding off the request path.** The ~80MB model
-  downloads lazily inside the first `POST /api/sessions`, and feature-extraction runs
-  synchronously on the main thread, blocking the event loop and risking the 60s
-  timeout. Warm the model at startup (instrumentation `register()`), run inference in
-  a worker thread, and index in the background (return `session_id` immediately,
-  mark the session `indexing` → `ready`).
+- **[P1][availability] Index in the background.** Mostly addressed by the Pinecone
+  migration: the ~80MB local model that downloaded lazily and ran feature-extraction
+  on the main thread is gone, so embedding no longer blocks the event loop. Remaining:
+  `POST /api/sessions` still `await`s the Pinecone upserts (a network call that embeds
+  server-side) before returning, so a large CV can still approach the 60s timeout.
+  Return `session_id` immediately and index in the background, marking the session
+  `indexing` → `ready`.
 - **[P1][security] Treat scraped/CV text as untrusted at the LLM boundary.** Company
   HTML and CV text are stored raw in RAG and will later be fed to the interviewer
   LLM (voice branch). Wrap retrieved docs as reference data (not instructions) in the
   prompt to blunt stored/second-order prompt injection.
 - **[P2][privacy] Data lifecycle / PII.** CVs (names, contact, history) persist
-  indefinitely in SQLite + LanceDB with no deletion path or TTL. Add `deleteSession`
-  cascade (now exists for SQLite; extend to LanceDB via `deleteSessionDocs`) + a
-  retention sweep, and document the policy.
+  indefinitely in SQLite + Pinecone with no deletion path or TTL. The building blocks
+  exist (`deleteSession` for SQLite, `deleteSessionDocs` clears the Pinecone
+  namespace); wire them into a user-facing delete + a retention sweep, and document
+  the policy.
 - **[P2][abuse] Input ceilings + rate limiting.** `jd`/`companyText` have no
   server-side length cap and `req.formData()` buffers the whole body before the 5MB
   CV check; there's no rate limiting. Cap text lengths, guard `Content-Length`, add a
   basic limiter.
-- **[P3][perf] LanceDB vector index.** The shared `docs` table has no vector index;
-  `retrieve()` is a brute-force scan that grows with total corpus size. Build an
-  IVF_PQ/HNSW index (or partition per session) once it has enough rows.
+- **[P3][perf] ~~LanceDB vector index~~ (resolved by Pinecone migration).** No longer
+  applicable: Pinecone serverless builds and maintains the ANN index per namespace, so
+  retrieval is no longer a brute-force scan over a shared table.
 - **[P3][correctness] Reject empty-RAG sessions.** A CV whose text collapses to empty
   after whitespace normalization passes the `!cvText` guard but yields zero chunks,
   so a "ready" session can have no retrievable context. Assert the CV produced ≥1
