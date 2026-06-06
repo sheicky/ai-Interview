@@ -3,13 +3,11 @@
  *   npm run check:token
  */
 import { strict as assert } from "node:assert";
-import { NextRequest } from "next/server";
 import { GET } from "../app/api/elevenlabs/token/route";
 
 function ok(name: string) {
   console.log(`✓ ${name}`);
 }
-const req = () => new NextRequest("http://localhost/api/elevenlabs/token");
 
 async function main() {
   const savedKey = process.env.ELEVENLABS_API_KEY;
@@ -18,7 +16,7 @@ async function main() {
   try {
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_AGENT_ID;
-    assert.equal((await GET(req())).status, 500);
+    assert.equal((await GET()).status, 500);
     ok("missing env → 500");
 
     process.env.ELEVENLABS_API_KEY = "test-key";
@@ -34,7 +32,7 @@ async function main() {
       });
     }) as typeof fetch;
 
-    const res = await GET(req());
+    const res = await GET();
     assert.equal(res.status, 200);
     assert.equal((await res.json()).token, "tok_123");
     assert.ok(calledUrl.includes("/v1/convai/conversation/token"), "calls token endpoint");
@@ -43,7 +41,7 @@ async function main() {
     ok("mints token with xi-api-key + agent_id");
 
     globalThis.fetch = (async () => new Response("nope", { status: 401 })) as typeof fetch;
-    assert.equal((await GET(req())).status, 502);
+    assert.equal((await GET()).status, 502);
     ok("upstream error → 502");
 
     console.log("\nALL TOKEN SMOKE CHECKS PASSED");

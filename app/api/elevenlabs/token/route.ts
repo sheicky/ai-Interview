@@ -2,11 +2,9 @@
  * GET /api/elevenlabs/token — mint a WebRTC conversation token for the browser
  * client, using the server-side ELEVENLABS_API_KEY so it never reaches the client.
  */
-import type { NextRequest } from "next/server";
-
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest): Promise<Response> {
+export async function GET(): Promise<Response> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   const agentId = process.env.ELEVENLABS_AGENT_ID;
   if (!apiKey || !agentId) {

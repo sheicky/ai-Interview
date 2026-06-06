@@ -7,7 +7,7 @@
 import { randomUUID } from "node:crypto";
 import { strict as assert } from "node:assert";
 import { NextRequest } from "next/server";
-import { createSession, deleteSession, addTurn, getReport, deleteReport } from "../lib/db";
+import { createSession, deleteSession, addTurn, deleteReport } from "../lib/db";
 import { addSessionDocs, deleteSessionDocs } from "../lib/rag";
 import { transcriptToText, parseReport } from "../lib/report";
 
