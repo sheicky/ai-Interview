@@ -14,8 +14,8 @@
     "check:chat": "node --env-file=.env --import tsx scripts/chat-smoke.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.3",
     "@pinecone-database/pinecone": "^7.2.0",
-    "better-sqlite3": "^12.10.0",
     "next": "16.2.7",
     "openai": "^6.42.0",
     "react": "19.2.4",
@@ -23,7 +23,6 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

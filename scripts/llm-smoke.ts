@@ -56,7 +56,7 @@ async function main() {
 
   const sid = randomUUID();
   try {
-    createSession({ id: sid, company: "Acme Corp" });
+    await createSession({ id: sid, company: "Acme Corp" });
     await addSessionDocs(sid, [
       { kind: "cv", text: "Jane Doe led the billing rewrite at Acme and scaled payments to 10x volume." },
       { kind: "jd", text: "Hiring a senior backend engineer for the billing platform; needs payments experience." },
@@ -102,7 +102,7 @@ async function main() {
   } finally {
     await deleteSessionDocs(sid).catch(() => {});
     try {
-      deleteSession(sid);
+      await deleteSession(sid);
     } catch {
       /* best-effort */
     }

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     return Response.json({ error: "missing or invalid session_id" }, { status: 400 });
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return Response.json({ error: "unknown session" }, { status: 404 });
 
   return interviewTurnResponse({

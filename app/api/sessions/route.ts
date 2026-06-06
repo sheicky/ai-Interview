@@ -64,7 +64,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const sessionId = randomUUID();
   try {
-    createSession({ id: sessionId, company, companyUrl: companyUrl || undefined });
+    await createSession({ id: sessionId, company, companyUrl: companyUrl || undefined });
     await addSessionDocs(sessionId, [
       { kind: "cv", text: cvText },
       { kind: "jd", text: jd },
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       /* best-effort cleanup */
     }
     try {
-      deleteSession(sessionId);
+      await deleteSession(sessionId);
     } catch {
       /* best-effort cleanup */
     }

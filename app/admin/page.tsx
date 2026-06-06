@@ -43,8 +43,8 @@ function Stat({ title, value }: { title: string; value: string }) {
   );
 }
 
-export default function AdminPage() {
-  const m = getMetrics();
+export default async function AdminPage() {
+  const m = await getMetrics();
 
   if (m.totalInterviews === 0) {
     return (

@@ -1,44 +1,67 @@
 /**
- * SQLite (better-sqlite3) — sessions, turns, reports.
- * One file under DATA_DIR. Tables created on first import.
+ * libSQL (Turso) data layer — sessions, turns, reports.
+ * Dev/test: a local file DB under DATA_DIR. Production (Vercel): a Turso
+ * libsql:// URL via DATABASE_URL + DATABASE_AUTH_TOKEN. Schema created once.
  *
  *   sessions ──1:N──▶ turns        (the interview transcript)
  *           ──1:1──▶ reports       (the end-of-interview report)
  */
-import Database from "better-sqlite3";
+import { createClient, type Client } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "./paths";
 
-mkdirSync(DATA_DIR, { recursive: true });
+function makeUrl(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  mkdirSync(DATA_DIR, { recursive: true }); // file: needs the dir to exist
+  return `file:${join(DATA_DIR, "app.db")}`;
+}
 
-const db = new Database(join(DATA_DIR, "app.db"));
-db.pragma("journal_mode = WAL");
+const db: Client = createClient({
+  url: makeUrl(),
+  authToken: process.env.DATABASE_AUTH_TOKEN, // undefined for file: URLs — fine
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS sessions (
-    id          TEXT PRIMARY KEY,
-    company     TEXT NOT NULL,
-    company_url TEXT,
-    created_at  TEXT NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'created',
-    ended_at    TEXT
-  );
-  CREATE TABLE IF NOT EXISTS turns (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    ts         TEXT NOT NULL,
-    role       TEXT NOT NULL,
-    text       TEXT NOT NULL,
-    phase      TEXT,
-    latency_ms INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS reports (
-    session_id TEXT PRIMARY KEY,
-    created_at TEXT NOT NULL,
-    json       TEXT NOT NULL
-  );
-`);
+// Schema created once; every query awaits this first.
+let ready: Promise<void> | null = null;
+function ensureReady(): Promise<void> {
+  if (!ready) {
+    ready = db
+      .batch(
+        [
+          `CREATE TABLE IF NOT EXISTS sessions (
+             id TEXT PRIMARY KEY,
+             company TEXT NOT NULL,
+             company_url TEXT,
+             created_at TEXT NOT NULL,
+             status TEXT NOT NULL DEFAULT 'created',
+             ended_at TEXT
+           )`,
+          `CREATE TABLE IF NOT EXISTS turns (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             session_id TEXT NOT NULL,
+             ts TEXT NOT NULL,
+             role TEXT NOT NULL,
+             text TEXT NOT NULL,
+             phase TEXT,
+             latency_ms INTEGER
+           )`,
+          `CREATE TABLE IF NOT EXISTS reports (
+             session_id TEXT PRIMARY KEY,
+             created_at TEXT NOT NULL,
+             json TEXT NOT NULL
+           )`,
+        ],
+        "write",
+      )
+      .then(() => undefined)
+      .catch((err) => {
+        ready = null; // don't cache a failed init
+        throw err;
+      });
+  }
+  return ready;
+}
 
 export interface NewSession {
   id: string;
@@ -46,16 +69,19 @@ export interface NewSession {
   companyUrl?: string;
 }
 
-export function createSession(s: NewSession): void {
-  db.prepare(
-    `INSERT INTO sessions (id, company, company_url, created_at, status)
-     VALUES (?, ?, ?, ?, 'created')`,
-  ).run(s.id, s.company, s.companyUrl ?? null, new Date().toISOString());
+export async function createSession(s: NewSession): Promise<void> {
+  await ensureReady();
+  await db.execute({
+    sql: `INSERT INTO sessions (id, company, company_url, created_at, status)
+          VALUES (?, ?, ?, ?, 'created')`,
+    args: [s.id, s.company, s.companyUrl ?? null, new Date().toISOString()],
+  });
 }
 
 /** Remove a session row. Used to compensate when indexing fails mid-create. */
-export function deleteSession(id: string): void {
-  db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
+export async function deleteSession(id: string): Promise<void> {
+  await ensureReady();
+  await db.execute({ sql: `DELETE FROM sessions WHERE id = ?`, args: [id] });
 }
 
 export interface SessionRow {
@@ -67,32 +93,26 @@ export interface SessionRow {
   ended_at: string | null;
 }
 
-/** Fetch a session row (used to put the company name in the interviewer prompt). */
-export function getSession(id: string): SessionRow | undefined {
-  return db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(id) as
-    | SessionRow
-    | undefined;
+export async function getSession(id: string): Promise<SessionRow | undefined> {
+  await ensureReady();
+  const res = await db.execute({ sql: `SELECT * FROM sessions WHERE id = ?`, args: [id] });
+  return res.rows[0] as unknown as SessionRow | undefined;
 }
 
 /** Append one transcript turn. `latency_ms` is time-to-first-token for assistant turns. */
-export function addTurn(t: {
+export async function addTurn(t: {
   sessionId: string;
   role: string;
   text: string;
   phase?: string;
   latencyMs?: number;
-}): void {
-  db.prepare(
-    `INSERT INTO turns (session_id, ts, role, text, phase, latency_ms)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(
-    t.sessionId,
-    new Date().toISOString(),
-    t.role,
-    t.text,
-    t.phase ?? null,
-    t.latencyMs ?? null,
-  );
+}): Promise<void> {
+  await ensureReady();
+  await db.execute({
+    sql: `INSERT INTO turns (session_id, ts, role, text, phase, latency_ms)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [t.sessionId, new Date().toISOString(), t.role, t.text, t.phase ?? null, t.latencyMs ?? null],
+  });
 }
 
 export interface TurnRow {
@@ -106,10 +126,13 @@ export interface TurnRow {
 }
 
 /** All turns for a session, oldest first. */
-export function getTurns(sessionId: string): TurnRow[] {
-  return db
-    .prepare(`SELECT * FROM turns WHERE session_id = ? ORDER BY id ASC`)
-    .all(sessionId) as TurnRow[];
+export async function getTurns(sessionId: string): Promise<TurnRow[]> {
+  await ensureReady();
+  const res = await db.execute({
+    sql: `SELECT * FROM turns WHERE session_id = ? ORDER BY id ASC`,
+    args: [sessionId],
+  });
+  return res.rows as unknown as TurnRow[];
 }
 
 export interface ReportRow {
@@ -119,40 +142,46 @@ export interface ReportRow {
 }
 
 /** Fetch a stored report (undefined if none). */
-export function getReport(sessionId: string): ReportRow | undefined {
-  return db.prepare(`SELECT * FROM reports WHERE session_id = ?`).get(sessionId) as
-    | ReportRow
-    | undefined;
+export async function getReport(sessionId: string): Promise<ReportRow | undefined> {
+  await ensureReady();
+  const res = await db.execute({ sql: `SELECT * FROM reports WHERE session_id = ?`, args: [sessionId] });
+  return res.rows[0] as unknown as ReportRow | undefined;
 }
 
 /** Upsert a report (one per session). */
-export function saveReport(sessionId: string, json: string): void {
-  db.prepare(
-    `INSERT OR REPLACE INTO reports (session_id, created_at, json) VALUES (?, ?, ?)`,
-  ).run(sessionId, new Date().toISOString(), json);
+export async function saveReport(sessionId: string, json: string): Promise<void> {
+  await ensureReady();
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO reports (session_id, created_at, json) VALUES (?, ?, ?)`,
+    args: [sessionId, new Date().toISOString(), json],
+  });
 }
 
 /** Remove a session's report (used in test cleanup). */
-export function deleteReport(sessionId: string): void {
-  db.prepare(`DELETE FROM reports WHERE session_id = ?`).run(sessionId);
+export async function deleteReport(sessionId: string): Promise<void> {
+  await ensureReady();
+  await db.execute({ sql: `DELETE FROM reports WHERE session_id = ?`, args: [sessionId] });
 }
 
 /** All sessions, newest first. */
-export function getAllSessions(): SessionRow[] {
-  return db.prepare(`SELECT * FROM sessions ORDER BY created_at DESC`).all() as SessionRow[];
+export async function getAllSessions(): Promise<SessionRow[]> {
+  await ensureReady();
+  const res = await db.execute(`SELECT * FROM sessions ORDER BY created_at DESC`);
+  return res.rows as unknown as SessionRow[];
 }
 
 /** All stored reports. */
-export function getAllReports(): ReportRow[] {
-  return db.prepare(`SELECT * FROM reports`).all() as ReportRow[];
+export async function getAllReports(): Promise<ReportRow[]> {
+  await ensureReady();
+  const res = await db.execute(`SELECT * FROM reports`);
+  return res.rows as unknown as ReportRow[];
 }
 
 /** Per-session count of candidate (role='user') turns — a proxy for interview length. */
-export function getCandidateTurnCounts(): number[] {
-  const rows = db
-    .prepare(`SELECT COUNT(*) AS n FROM turns WHERE role = 'user' GROUP BY session_id`)
-    .all() as { n: number }[];
-  return rows.map((r) => r.n);
+export async function getCandidateTurnCounts(): Promise<number[]> {
+  await ensureReady();
+  const res = await db.execute(`SELECT COUNT(*) AS n FROM turns WHERE role = 'user' GROUP BY session_id`);
+  return res.rows.map((r) => Number((r as unknown as { n: number | bigint }).n));
 }
 
 export default db;
