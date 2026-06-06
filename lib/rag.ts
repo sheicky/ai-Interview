@@ -1,74 +1,29 @@
 /**
- * Session-scoped RAG over LanceDB.
+ * Session-scoped RAG over Pinecone (integrated index, server-side embeddings).
  *
- * One table `docs`; every row is tagged with `session_id`. Retrieval filters on
- * session_id, so an interview can ONLY ever retrieve its own CV / JD / company
- * docs. That metadata filter is the no-cross-session-leak guarantee (proves R2).
+ * Each session_id is its own Pinecone namespace, so an interview can ONLY ever
+ * retrieve its own CV / JD / company docs. That namespace boundary is the
+ * no-cross-session-leak guarantee.
  *
- *   addSessionDocs(sid, [{kind, text}])  → chunk → embed → insert tagged sid
- *   retrieve(query, sid)                 → embed query → search WHERE session_id = sid
+ *   addSessionDocs(sid, [{kind, text}])  → chunk → upsertRecords into ns=sid
+ *   retrieve(query, sid)                 → searchRecords (text) within ns=sid
+ *   deleteSessionDocs(sid)               → deleteAll in ns=sid
  */
-import * as lancedb from "@lancedb/lancedb";
-import { mkdirSync } from "node:fs";
-import { embed, EMBED_DIM } from "./embeddings";
-import { LANCE_DIR } from "./paths";
-
-const TABLE = "docs";
+import { sessionIndex } from "./pinecone";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** The `.where(session_id = '…')` filter is the no-cross-session-leak barrier, so
- *  the id must never depend on string escaping to stay safe. Require a real UUID
- *  (route mints randomUUID()) before any value reaches the filter. */
+// Integrated upsert caps a request at 96 records; batch to stay under it.
+const UPSERT_BATCH = 96;
+
+/** session_id becomes the Pinecone namespace name, so require a real UUID
+ *  (route mints randomUUID()) before any value reaches Pinecone. */
 function assertSessionId(id: string): void {
   if (!UUID_RE.test(id)) throw new Error("invalid session id");
 }
 
-interface DocRecord {
-  vector: number[];
-  session_id: string;
-  kind: string;
-  text: string;
-  // lancedb's createTable/add expect Record<string, unknown>-compatible rows.
-  [key: string]: unknown;
-}
-
-let tablePromise: Promise<lancedb.Table> | null = null;
-
-async function getTable(): Promise<lancedb.Table> {
-  // Don't cache a rejected promise: one transient cold-start failure would
-  // otherwise wedge every later request into a permanent 500 until restart.
-  if (!tablePromise) {
-    tablePromise = openOrCreate().catch((err) => {
-      tablePromise = null;
-      throw err;
-    });
-  }
-  return tablePromise;
-}
-
-async function openOrCreate(): Promise<lancedb.Table> {
-  mkdirSync(LANCE_DIR, { recursive: true });
-  const db = await lancedb.connect(LANCE_DIR);
-  const names = await db.tableNames();
-  if (names.includes(TABLE)) return db.openTable(TABLE);
-  // Create with an explicit schema by seeding one row, then removing it.
-  // existOk makes this idempotent across concurrent workers/processes racing the
-  // cold path — the loser opens the existing table instead of throwing. A leftover
-  // __seed__ row is harmless: its session_id can never match a real UUID filter.
-  const seed: DocRecord = {
-    vector: new Array(EMBED_DIM).fill(0),
-    session_id: "__seed__",
-    kind: "seed",
-    text: "",
-  };
-  const table = await db.createTable(TABLE, [seed], { existOk: true });
-  await table.delete("session_id = '__seed__'");
-  return table;
-}
-
 /** Split text into ~800-char chunks for better retrieval granularity. */
-function chunk(text: string, size = 800): string[] {
+export function chunk(text: string, size = 800): string[] {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const out: string[] = [];
@@ -76,8 +31,10 @@ function chunk(text: string, size = 800): string[] {
   return out;
 }
 
-function escapeSql(value: string): string {
-  return value.replace(/'/g, "''");
+function batches<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
 }
 
 export async function addSessionDocs(
@@ -85,18 +42,20 @@ export async function addSessionDocs(
   docs: { kind: string; text: string }[],
 ): Promise<void> {
   assertSessionId(sessionId);
-  const records: DocRecord[] = [];
-  for (const doc of docs) {
-    const pieces = chunk(doc.text);
-    if (pieces.length === 0) continue;
-    const vectors = await embed(pieces);
-    pieces.forEach((text, i) =>
-      records.push({ vector: vectors[i], session_id: sessionId, kind: doc.kind, text }),
+  // _id unique within the namespace; `text` matches the index fieldMap so
+  // Pinecone embeds it; `kind` is stored as metadata.
+  const records: { _id: string; text: string; kind: string }[] = [];
+  docs.forEach((doc, d) => {
+    // `${d}-...` keeps ids unique even if two docs share a kind.
+    chunk(doc.text).forEach((text, i) =>
+      records.push({ _id: `${d}-${doc.kind}-${i}`, text, kind: doc.kind }),
     );
-  }
+  });
   if (records.length === 0) return;
-  const table = await getTable();
-  await table.add(records);
+  const idx = sessionIndex(sessionId);
+  for (const batch of batches(records, UPSERT_BATCH)) {
+    await idx.upsertRecords({ records: batch });
+  }
 }
 
 export async function retrieve(
@@ -105,20 +64,25 @@ export async function retrieve(
   k = 5,
 ): Promise<{ kind: string; text: string }[]> {
   assertSessionId(sessionId);
-  const [qv] = await embed([query]);
-  if (!qv) return [];
-  const table = await getTable();
-  const rows = await table
-    .search(qv)
-    .where(`session_id = '${escapeSql(sessionId)}'`)
-    .limit(k)
-    .toArray();
-  return rows.map((r) => ({ kind: String(r.kind), text: String(r.text) }));
+  const res = await sessionIndex(sessionId).searchRecords({
+    query: { topK: k, inputs: { text: query } },
+  });
+  const hits = res.result?.hits ?? [];
+  return hits.map((h) => {
+    const f = (h.fields ?? {}) as Record<string, unknown>;
+    return { kind: String(f.kind ?? ""), text: String(f.text ?? "") };
+  });
 }
 
 /** Remove a session's docs. Used to compensate when session creation fails partway. */
 export async function deleteSessionDocs(sessionId: string): Promise<void> {
   assertSessionId(sessionId);
-  const table = await getTable();
-  await table.delete(`session_id = '${escapeSql(sessionId)}'`);
+  try {
+    await sessionIndex(sessionId).deleteAll();
+  } catch (err) {
+    // A namespace that was never created (0 docs added) 404s on deleteAll.
+    // Treat "not found" as a no-op; rethrow anything else.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/not found|404/i.test(msg)) throw err;
+  }
 }
