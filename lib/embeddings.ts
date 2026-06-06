@@ -17,8 +17,15 @@ type Extractor = (
 let extractorPromise: Promise<Extractor> | null = null;
 
 function getExtractor(): Promise<Extractor> {
+  // Don't cache a rejected promise: a transient first-load failure (e.g. the
+  // one-time model download) must not wedge every later embed() into a 500.
   if (!extractorPromise) {
-    extractorPromise = pipeline("feature-extraction", MODEL) as unknown as Promise<Extractor>;
+    extractorPromise = (pipeline("feature-extraction", MODEL) as unknown as Promise<Extractor>).catch(
+      (err) => {
+        extractorPromise = null;
+        throw err;
+      },
+    );
   }
   return extractorPromise;
 }

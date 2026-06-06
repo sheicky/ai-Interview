@@ -8,8 +8,8 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { DATA_DIR } from "./paths";
 
-const DATA_DIR = process.env.DATA_DIR ?? ".data";
 mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new Database(join(DATA_DIR, "app.db"));
@@ -51,6 +51,11 @@ export function createSession(s: NewSession): void {
     `INSERT INTO sessions (id, company, company_url, created_at, status)
      VALUES (?, ?, ?, ?, 'created')`,
   ).run(s.id, s.company, s.companyUrl ?? null, new Date().toISOString());
+}
+
+/** Remove a session row. Used to compensate when indexing fails mid-create. */
+export function deleteSession(id: string): void {
+  db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
 }
 
 export default db;

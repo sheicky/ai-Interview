@@ -10,12 +10,19 @@
  */
 import * as lancedb from "@lancedb/lancedb";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { embed, EMBED_DIM } from "./embeddings";
+import { LANCE_DIR } from "./paths";
 
-const DATA_DIR = process.env.DATA_DIR ?? ".data";
-const LANCE_DIR = join(DATA_DIR, "lancedb");
 const TABLE = "docs";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** The `.where(session_id = '…')` filter is the no-cross-session-leak barrier, so
+ *  the id must never depend on string escaping to stay safe. Require a real UUID
+ *  (route mints randomUUID()) before any value reaches the filter. */
+function assertSessionId(id: string): void {
+  if (!UUID_RE.test(id)) throw new Error("invalid session id");
+}
 
 interface DocRecord {
   vector: number[];
@@ -29,7 +36,14 @@ interface DocRecord {
 let tablePromise: Promise<lancedb.Table> | null = null;
 
 async function getTable(): Promise<lancedb.Table> {
-  if (!tablePromise) tablePromise = openOrCreate();
+  // Don't cache a rejected promise: one transient cold-start failure would
+  // otherwise wedge every later request into a permanent 500 until restart.
+  if (!tablePromise) {
+    tablePromise = openOrCreate().catch((err) => {
+      tablePromise = null;
+      throw err;
+    });
+  }
   return tablePromise;
 }
 
@@ -39,13 +53,16 @@ async function openOrCreate(): Promise<lancedb.Table> {
   const names = await db.tableNames();
   if (names.includes(TABLE)) return db.openTable(TABLE);
   // Create with an explicit schema by seeding one row, then removing it.
+  // existOk makes this idempotent across concurrent workers/processes racing the
+  // cold path — the loser opens the existing table instead of throwing. A leftover
+  // __seed__ row is harmless: its session_id can never match a real UUID filter.
   const seed: DocRecord = {
     vector: new Array(EMBED_DIM).fill(0),
     session_id: "__seed__",
     kind: "seed",
     text: "",
   };
-  const table = await db.createTable(TABLE, [seed]);
+  const table = await db.createTable(TABLE, [seed], { existOk: true });
   await table.delete("session_id = '__seed__'");
   return table;
 }
@@ -67,6 +84,7 @@ export async function addSessionDocs(
   sessionId: string,
   docs: { kind: string; text: string }[],
 ): Promise<void> {
+  assertSessionId(sessionId);
   const records: DocRecord[] = [];
   for (const doc of docs) {
     const pieces = chunk(doc.text);
@@ -86,6 +104,7 @@ export async function retrieve(
   sessionId: string,
   k = 5,
 ): Promise<{ kind: string; text: string }[]> {
+  assertSessionId(sessionId);
   const [qv] = await embed([query]);
   if (!qv) return [];
   const table = await getTable();
@@ -95,4 +114,11 @@ export async function retrieve(
     .limit(k)
     .toArray();
   return rows.map((r) => ({ kind: String(r.kind), text: String(r.text) }));
+}
+
+/** Remove a session's docs. Used to compensate when session creation fails partway. */
+export async function deleteSessionDocs(sessionId: string): Promise<void> {
+  assertSessionId(sessionId);
+  const table = await getTable();
+  await table.delete(`session_id = '${escapeSql(sessionId)}'`);
 }
