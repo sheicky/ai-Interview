@@ -252,3 +252,30 @@ flowchart LR
 - `session_id` reaches the brain via **`customLlmExtraBody`** (the POST body), not `dynamicVariables` (prompt substitution only).
 - `cascade_timeout_seconds = 15` so the custom LLM beats cold start + Pinecone + first token.
 - One Pinecone namespace per session = hard isolation between candidates.
+
+---
+
+## 8. RAG pipeline (minimal — for a quick walkthrough)
+
+The whole loop in one picture: **documents → Pinecone (store) → speech → Pinecone (retrieve) → grounded reply.** Pinecone is an *integrated* index, so it does the embedding itself (no separate model in our code).
+
+```mermaid
+flowchart LR
+  subgraph Ingest["① Setup — once per interview"]
+    Docs["CV + Job description"] --> API["/api/sessions"]
+    API --> PC[("Pinecone<br/>embeds + stores<br/>1 namespace per candidate")]
+  end
+
+  subgraph Turn["② Each spoken turn"]
+    Voice["Candidate speaks"] --> Q["Transcript = query"]
+    Q --> Search["Pinecone search<br/>same namespace"]
+    Search --> Top["Top snippets<br/>from CV / JD"]
+    Top --> Prompt["Interviewer prompt<br/>+ snippets"]
+    Prompt --> LLM["Claude<br/>via OpenRouter"]
+    LLM --> Reply["Grounded question<br/>spoken back"]
+  end
+
+  PC -. retrieves from .-> Search
+```
+
+**~50s narration:** A candidate's CV and the job description go to our API, which hands the text to Pinecone — it embeds and stores it, one namespace per candidate so résumés never mix. Then, on every spoken turn, the transcript becomes a search query; Pinecone returns the most relevant CV/JD snippets; those go into the interviewer prompt; Claude generates the next question grounded in them; and it's spoken back — always specific to this person and this role.
