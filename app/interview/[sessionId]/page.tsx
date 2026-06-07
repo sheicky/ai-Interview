@@ -127,11 +127,11 @@ function VoiceInterview() {
               style={{
                 ...s.orb,
                 background: isSpeaking
-                  ? "radial-gradient(circle at 35% 30%, #9cc0ff, #2f6df6 60%, #1d4ed8)"
-                  : "radial-gradient(circle at 35% 30%, #6f8bd6, #2f4ea8 65%, #243a73)",
+                  ? "radial-gradient(circle at 34% 28%, #ffffff, #ffe3cc 52%, #ff9cdf 100%)"
+                  : "radial-gradient(circle at 34% 28%, #fff6ee, #ffd9c2 60%, #fbb38b 100%)",
                 boxShadow: isSpeaking
-                  ? "0 0 80px 8px rgba(47,109,246,0.55)"
-                  : "0 0 48px 4px rgba(47,109,246,0.25)",
+                  ? "0 0 90px 10px rgba(255,255,255,0.6)"
+                  : "0 0 54px 6px rgba(255,255,255,0.4)",
               }}
             />
           </div>
@@ -160,9 +160,9 @@ const s: Record<string, React.CSSProperties> = {
     display: "grid",
     placeItems: "center",
     padding: 24,
-    color: "#e8eaf1",
+    color: "#2a1622",
     background:
-      "radial-gradient(115% 75% at 50% 30%, #1a2236 0%, #0e1320 48%, #080a12 100%)",
+      "radial-gradient(60% 50% at 50% 40%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%), linear-gradient(135deg, #ff9cdf 0%, #fb8144 100%)",
   },
   center: {
     display: "flex",
@@ -173,9 +173,9 @@ const s: Record<string, React.CSSProperties> = {
     maxWidth: 560,
   },
   h1: { fontSize: 30, letterSpacing: "-0.02em", fontWeight: 600, margin: 0 },
-  sub: { color: "#9aa3b8", margin: 0, fontSize: 15, lineHeight: 1.55 },
+  sub: { color: "rgba(42,22,34,0.72)", margin: 0, fontSize: 15, lineHeight: 1.55 },
   startBtn: {
-    background: "var(--accent)",
+    background: "#1a1014",
     color: "#fff",
     border: "none",
     borderRadius: 999,
@@ -191,7 +191,7 @@ const s: Record<string, React.CSSProperties> = {
     width: 240,
     height: 240,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(47,109,246,0.18) 0%, rgba(47,109,246,0) 68%)",
+    background: "radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 68%)",
   },
   orb: {
     width: 150,
@@ -200,25 +200,25 @@ const s: Record<string, React.CSSProperties> = {
     transition: "background 0.25s ease, box-shadow 0.25s ease, transform 0.08s linear",
   },
   state: {
-    color: "#9aa3b8",
+    color: "rgba(42,22,34,0.65)",
     margin: 0,
     fontSize: 13,
     letterSpacing: "0.04em",
     textTransform: "uppercase",
   },
-  caption: { minHeight: 56, fontSize: 19, lineHeight: 1.45, margin: 0, maxWidth: 520, color: "#f1f3f9" },
+  caption: { minHeight: 56, fontSize: 19, lineHeight: 1.45, margin: 0, maxWidth: 520, color: "#2a1622", fontWeight: 500 },
   controls: { display: "flex", gap: 12, marginTop: 10 },
   muteBtn: {
-    background: "rgba(255,255,255,0.08)",
-    color: "#e8eaf1",
-    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.6)",
+    color: "#2a1622",
+    border: "1px solid rgba(42,22,34,0.16)",
     borderRadius: 999,
     padding: "11px 22px",
     fontWeight: 600,
     cursor: "pointer",
   },
   endBtn: {
-    background: "#e0564f",
+    background: "#1a1014",
     color: "#fff",
     border: "none",
     borderRadius: 999,
@@ -226,5 +226,5 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
   },
-  error: { color: "#ff9b9b", fontSize: 14 },
+  error: { color: "#7a1410", fontSize: 14 },
 };

@@ -79,3 +79,13 @@ a:hover {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Print-to-PDF (report page): drop the chrome, keep the report clean. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}
