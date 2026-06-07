@@ -2,9 +2,11 @@
  * /report/[sessionId] — renders the stored interview report (server component,
  * reads SQLite directly). No auth, session-scoped by the URL.
  */
+import Link from "next/link";
 import { getReport } from "@/lib/db";
 import type { Report } from "@/lib/report";
 import { DownloadButton } from "./DownloadButton";
+import { ReportGenerator } from "./ReportGenerator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,13 +100,17 @@ export default async function ReportPage({
 
   const row = await getReport(sessionId);
   if (!row) {
+    // No stored report yet — generate it on demand (client-side, with retry).
+    // This is the normal path right after an interview ends.
     return (
       <main style={page}>
-        <h1>Report</h1>
-        <p style={{ color: "#6b7280" }}>
-          Report isn&apos;t ready yet.{" "}
-          <a href={`/interview/${sessionId}`}>Back to the interview</a>
-        </p>
+        <header style={{ marginBottom: "1.5rem" }}>
+          <span style={eyebrow}>AI Interview</span>
+          <h1 style={{ fontSize: 28, letterSpacing: "-0.02em", fontWeight: 600, margin: "6px 0 0" }}>
+            Interview report
+          </h1>
+        </header>
+        <ReportGenerator sessionId={sessionId} cardStyle={card} btnStyle={btnPrimary} mutedColor="var(--muted)" />
       </main>
     );
   }
@@ -157,9 +163,9 @@ export default async function ReportPage({
       <List title="Suggested next steps" items={r.next_steps} />
 
       <div className="no-print" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: "1.75rem" }}>
-        <a href="/" style={btnPrimary}>
+        <Link href="/" style={btnPrimary}>
           Take another interview
-        </a>
+        </Link>
         <DownloadButton style={btnGhost} />
       </div>
     </main>
