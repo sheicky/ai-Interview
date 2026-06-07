@@ -117,13 +117,16 @@ export default function Home() {
 const styles: Record<string, React.CSSProperties> = {
   main: {
     minHeight: "100vh",
-    display: "grid",
-    placeItems: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
     padding: "48px 24px",
     background: "var(--hero)",
     color: "var(--ink)",
   },
-  shell: { width: "100%", maxWidth: 540 },
+  shell: { width: "100%", maxWidth: 540, minWidth: 0 },
   head: { textAlign: "center", marginBottom: 24 },
   brand: {
     display: "inline-flex",
@@ -175,6 +178,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   row: { display: "flex", gap: 14, flexWrap: "wrap" },
   input: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
     fontSize: 15,
     fontWeight: 400,
     padding: "11px 13px",
