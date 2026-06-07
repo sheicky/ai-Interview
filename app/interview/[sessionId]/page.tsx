@@ -121,9 +121,18 @@ function VoiceInterview() {
       ) : (
         <div style={s.center}>
           <div style={s.orbWrap}>
+            <div style={s.halo} aria-hidden />
             <div
               ref={orbRef}
-              style={{ ...s.orb, background: isSpeaking ? "#2563eb" : "#93c5fd" }}
+              style={{
+                ...s.orb,
+                background: isSpeaking
+                  ? "radial-gradient(circle at 35% 30%, #9cc0ff, #2f6df6 60%, #1d4ed8)"
+                  : "radial-gradient(circle at 35% 30%, #6f8bd6, #2f4ea8 65%, #243a73)",
+                boxShadow: isSpeaking
+                  ? "0 0 80px 8px rgba(47,109,246,0.55)"
+                  : "0 0 48px 4px rgba(47,109,246,0.25)",
+              }}
             />
           </div>
           <p style={s.state}>
@@ -146,17 +155,76 @@ function VoiceInterview() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  main: { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "system-ui, sans-serif", color: "#1a1a1a", background: "#fafafa" },
-  center: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", maxWidth: 560 },
-  h1: { fontSize: 26, margin: 0 },
-  sub: { color: "#6b7280", margin: 0 },
-  startBtn: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 999, padding: "14px 28px", fontSize: 16, fontWeight: 600, cursor: "pointer" },
-  orbWrap: { height: 220, display: "grid", placeItems: "center" },
-  orb: { width: 140, height: 140, borderRadius: "50%", transition: "background 0.2s ease", boxShadow: "0 12px 40px rgba(37,99,235,0.35)" },
-  state: { color: "#6b7280", margin: 0, fontSize: 14 },
-  caption: { minHeight: 48, fontSize: 18, lineHeight: 1.4, margin: 0, maxWidth: 520 },
-  controls: { display: "flex", gap: 12, marginTop: 8 },
-  muteBtn: { background: "#e5e7eb", color: "#1a1a1a", border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer" },
-  endBtn: { background: "#ef4444", color: "#fff", border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer" },
-  error: { color: "#dc2626", fontSize: 14 },
+  main: {
+    minHeight: "100vh",
+    display: "grid",
+    placeItems: "center",
+    padding: 24,
+    color: "#e8eaf1",
+    background:
+      "radial-gradient(115% 75% at 50% 30%, #1a2236 0%, #0e1320 48%, #080a12 100%)",
+  },
+  center: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 18,
+    textAlign: "center",
+    maxWidth: 560,
+  },
+  h1: { fontSize: 30, letterSpacing: "-0.02em", fontWeight: 600, margin: 0 },
+  sub: { color: "#9aa3b8", margin: 0, fontSize: 15, lineHeight: 1.55 },
+  startBtn: {
+    background: "var(--accent)",
+    color: "#fff",
+    border: "none",
+    borderRadius: 999,
+    padding: "15px 34px",
+    fontSize: 16,
+    fontWeight: 600,
+    cursor: "pointer",
+    marginTop: 6,
+  },
+  orbWrap: { position: "relative", height: 260, width: 260, display: "grid", placeItems: "center" },
+  halo: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(47,109,246,0.18) 0%, rgba(47,109,246,0) 68%)",
+  },
+  orb: {
+    width: 150,
+    height: 150,
+    borderRadius: "50%",
+    transition: "background 0.25s ease, box-shadow 0.25s ease, transform 0.08s linear",
+  },
+  state: {
+    color: "#9aa3b8",
+    margin: 0,
+    fontSize: 13,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+  },
+  caption: { minHeight: 56, fontSize: 19, lineHeight: 1.45, margin: 0, maxWidth: 520, color: "#f1f3f9" },
+  controls: { display: "flex", gap: 12, marginTop: 10 },
+  muteBtn: {
+    background: "rgba(255,255,255,0.08)",
+    color: "#e8eaf1",
+    border: "1px solid rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    padding: "11px 22px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  endBtn: {
+    background: "#e0564f",
+    color: "#fff",
+    border: "none",
+    borderRadius: 999,
+    padding: "11px 22px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  error: { color: "#ff9b9b", fontSize: 14 },
 };
