@@ -1,11 +1,17 @@
 /**
  * /admin — read-only aggregate metrics dashboard. Server component; reads SQLite
- * directly on each request. No auth (publicly viewable, by design).
+ * directly on each request. Gated by a code (ADMIN_CODE) held in an httpOnly
+ * cookie — metrics are never rendered until the cookie matches.
  */
+import { cookies } from "next/headers";
 import { getMetrics } from "@/lib/metrics";
+import { login } from "./actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ADMIN_CODE = process.env.ADMIN_CODE ?? "";
+const ADMIN_COOKIE = "admin_auth"; // keep in sync with app/admin/actions.ts
 
 const page: React.CSSProperties = {
   maxWidth: 900,
@@ -43,7 +49,81 @@ function Stat({ title, value }: { title: string; value: string }) {
   );
 }
 
-export default async function AdminPage() {
+const gateWrap: React.CSSProperties = {
+  minHeight: "100vh",
+  display: "grid",
+  placeItems: "center",
+  fontFamily: "system-ui, -apple-system, sans-serif",
+  color: "#1a1a1a",
+  padding: "2rem",
+};
+const gateForm: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.75rem",
+  width: "100%",
+  maxWidth: 280,
+  textAlign: "center",
+};
+const gateInput: React.CSSProperties = {
+  padding: "0.7rem 0.9rem",
+  fontSize: "1rem",
+  border: "1px solid #d0d0d0",
+  borderRadius: 8,
+  textAlign: "center",
+  letterSpacing: "0.2em",
+};
+const gateBtn: React.CSSProperties = {
+  padding: "0.7rem 0.9rem",
+  fontSize: "1rem",
+  fontWeight: 600,
+  color: "#fff",
+  background: "#2563eb",
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+};
+
+function Gate({ error }: { error: boolean }) {
+  return (
+    <main style={gateWrap}>
+      <form action={login} style={gateForm}>
+        <h1 style={{ fontSize: "1.25rem", margin: 0 }}>Admin access</h1>
+        <p style={{ ...label, margin: 0 }}>Enter the access code to view metrics.</p>
+        <input
+          style={gateInput}
+          type="password"
+          name="code"
+          inputMode="numeric"
+          autoComplete="off"
+          autoFocus
+          placeholder="Access code"
+          aria-label="Access code"
+        />
+        <button style={gateBtn} type="submit">
+          Unlock
+        </button>
+        {error && (
+          <p role="alert" style={{ color: "#dc2626", fontSize: "0.85rem", margin: 0 }}>
+            Incorrect code. Try again.
+          </p>
+        )}
+      </form>
+    </main>
+  );
+}
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const authed = ADMIN_CODE !== "" && (await cookies()).get(ADMIN_COOKIE)?.value === ADMIN_CODE;
+  if (!authed) {
+    const { error } = await searchParams;
+    return <Gate error={error === "1"} />;
+  }
+
   const m = await getMetrics();
 
   if (m.totalInterviews === 0) {
