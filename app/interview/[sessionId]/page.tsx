@@ -47,7 +47,11 @@ function VoiceInterview() {
       const { token } = (await res.json()) as { token: string };
       await conversation.startSession({
         conversationToken: token,
+        // dynamicVariables feed prompt substitution; customLlmExtraBody is what
+        // ElevenLabs merges into the POST body sent to our custom LLM, so the
+        // brain can resolve the session and ground the interview in Pinecone.
         dynamicVariables: { session_id: sessionId },
+        customLlmExtraBody: { session_id: sessionId },
       });
       setPhase("live");
     } catch {

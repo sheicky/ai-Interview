@@ -36,6 +36,7 @@ function findSessionId(body: unknown): string | null {
   };
   if (typeof b.session_id === "string") return b.session_id;
   return (
+    fromObj(b.custom_llm_extra_body) ??
     fromObj(b.elevenlabs_extra_body) ??
     fromObj(b.dynamic_variables) ??
     (typeof b.system__session_id === "string" ? b.system__session_id : null)
