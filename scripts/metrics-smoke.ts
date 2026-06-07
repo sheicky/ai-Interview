@@ -12,7 +12,7 @@ function ok(name: string) {
 }
 
 function session(id: string, company: string, created_at: string): SessionRow {
-  return { id, company, company_url: null, created_at, status: "created", ended_at: null };
+  return { id, company, company_url: null, role: null, created_at, status: "created", ended_at: null };
 }
 
 function report(overall: number, band: "strong" | "mixed" | "weak", companyFit: number | null): Report {

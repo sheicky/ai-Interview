@@ -65,15 +65,20 @@ export default function Home() {
           </label>
 
           <div style={styles.row}>
-            <label style={{ ...styles.label, flex: 1 }}>
+            <label style={{ ...styles.label, flex: 1, minWidth: 180 }}>
+              Role
+              <input name="role" type="text" required placeholder="Senior Backend Engineer" style={styles.input} />
+            </label>
+            <label style={{ ...styles.label, flex: 1, minWidth: 180 }}>
               Company
               <input name="company" type="text" required placeholder="Acme Inc." style={styles.input} />
             </label>
-            <label style={{ ...styles.label, flex: 1 }}>
-              Company website (optional)
-              <input name="companyUrl" type="url" placeholder="https://acme.com" style={styles.input} />
-            </label>
           </div>
+
+          <label style={styles.label}>
+            Company website (optional)
+            <input name="companyUrl" type="url" placeholder="https://acme.com" style={styles.input} />
+          </label>
 
           <button
             type="submit"

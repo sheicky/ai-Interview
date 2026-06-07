@@ -45,12 +45,18 @@ function VoiceInterview() {
         return;
       }
       const { token } = (await res.json()) as { token: string };
+      // Fetch the role so the agent's opening can name the specific position
+      // (substituted into the first message via the {{role}} dynamic variable).
+      const meta = (await fetch(`/api/sessions/${sessionId}`)
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({}))) as { role?: string };
+      const role = meta.role?.trim() || "open";
       await conversation.startSession({
         conversationToken: token,
-        // dynamicVariables feed prompt substitution; customLlmExtraBody is what
-        // ElevenLabs merges into the POST body sent to our custom LLM, so the
-        // brain can resolve the session and ground the interview in Pinecone.
-        dynamicVariables: { session_id: sessionId },
+        // dynamicVariables feed prompt substitution (e.g. {{role}} in the first
+        // message); customLlmExtraBody is what ElevenLabs merges into the POST
+        // body to our custom LLM, so the brain resolves the session for RAG.
+        dynamicVariables: { session_id: sessionId, role },
         customLlmExtraBody: { session_id: sessionId },
       });
       setPhase("live");
