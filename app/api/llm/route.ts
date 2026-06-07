@@ -17,14 +17,20 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 function findSessionId(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
+  const fromObj = (o: unknown): string | null => {
+    if (o && typeof o === "object") {
+      const v = (o as Record<string, unknown>).session_id;
+      if (typeof v === "string") return v;
+    }
+    return null;
+  };
   if (typeof b.session_id === "string") return b.session_id;
-  const extra = b.elevenlabs_extra_body;
-  if (extra && typeof extra === "object") {
-    const sid = (extra as Record<string, unknown>).session_id;
-    if (typeof sid === "string") return sid;
-  }
-  if (typeof b.system__session_id === "string") return b.system__session_id;
-  return null;
+  return (
+    fromObj(b.custom_llm_extra_body) ??
+    fromObj(b.elevenlabs_extra_body) ??
+    fromObj(b.dynamic_variables) ??
+    (typeof b.system__session_id === "string" ? b.system__session_id : null)
+  );
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
