@@ -6,6 +6,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ id: string; scraped: boolean } | null>(null);
+  const [cvName, setCvName] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,7 +51,20 @@ export default function Home() {
         <form onSubmit={onSubmit} style={styles.form}>
           <label style={styles.label}>
             Your CV (PDF)
-            <input name="cv" type="file" accept="application/pdf" required style={styles.input} />
+            <span style={styles.fileRow}>
+              <span style={styles.fileBtn}>Choose PDF</span>
+              <span style={cvName ? styles.fileName : styles.filePlaceholder}>
+                {cvName ?? "No file selected"}
+              </span>
+              <input
+                name="cv"
+                type="file"
+                accept="application/pdf"
+                required
+                onChange={(e) => setCvName(e.target.files?.[0]?.name ?? null)}
+                style={styles.fileNative}
+              />
+            </span>
           </label>
 
           <label style={styles.label}>
@@ -190,6 +204,56 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fcfcfb",
     color: "var(--ink)",
     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  },
+  fileRow: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: 8,
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius-sm)",
+    background: "#fcfcfb",
+    cursor: "pointer",
+  },
+  fileBtn: {
+    flexShrink: 0,
+    background: "var(--bg-tint)",
+    border: "1px solid var(--line)",
+    borderRadius: 999,
+    padding: "7px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--ink)",
+    whiteSpace: "nowrap",
+  },
+  fileName: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: 400,
+    color: "var(--ink)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  filePlaceholder: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: 400,
+    color: "var(--muted)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  fileNative: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    opacity: 0,
+    cursor: "pointer",
   },
   button: {
     marginTop: 4,
