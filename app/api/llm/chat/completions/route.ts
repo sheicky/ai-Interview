@@ -61,6 +61,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   return interviewTurnResponse({
     sessionId,
     company: session.company,
+    role: session.role ?? undefined,
     messages: parseMessages(body),
     signal: req.signal,
   });

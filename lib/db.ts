@@ -33,6 +33,7 @@ function ensureReady(): Promise<void> {
              id TEXT PRIMARY KEY,
              company TEXT NOT NULL,
              company_url TEXT,
+             role TEXT,
              created_at TEXT NOT NULL,
              status TEXT NOT NULL DEFAULT 'created',
              ended_at TEXT
@@ -54,6 +55,14 @@ function ensureReady(): Promise<void> {
         ],
         "write",
       )
+      // Migration for DBs created before `role` existed (e.g. prod Turso):
+      // add the column if missing. Ignore the "duplicate column" error.
+      .then(() =>
+        db
+          .execute(`ALTER TABLE sessions ADD COLUMN role TEXT`)
+          .then(() => undefined)
+          .catch(() => undefined),
+      )
       .then(() => undefined)
       .catch((err) => {
         ready = null; // don't cache a failed init
@@ -67,14 +76,15 @@ export interface NewSession {
   id: string;
   company: string;
   companyUrl?: string;
+  role?: string;
 }
 
 export async function createSession(s: NewSession): Promise<void> {
   await ensureReady();
   await db.execute({
-    sql: `INSERT INTO sessions (id, company, company_url, created_at, status)
-          VALUES (?, ?, ?, ?, 'created')`,
-    args: [s.id, s.company, s.companyUrl ?? null, new Date().toISOString()],
+    sql: `INSERT INTO sessions (id, company, company_url, role, created_at, status)
+          VALUES (?, ?, ?, ?, ?, 'created')`,
+    args: [s.id, s.company, s.companyUrl ?? null, s.role ?? null, new Date().toISOString()],
   });
 }
 
@@ -88,6 +98,7 @@ export interface SessionRow {
   id: string;
   company: string;
   company_url: string | null;
+  role: string | null;
   created_at: string;
   status: string;
   ended_at: string | null;

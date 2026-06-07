@@ -38,10 +38,11 @@ export function parseMessages(body: unknown): Msg[] {
 export async function interviewTurnResponse(opts: {
   sessionId: string;
   company: string;
+  role?: string;
   messages: Msg[];
   signal?: AbortSignal;
 }): Promise<Response> {
-  const { sessionId, company, messages, signal } = opts;
+  const { sessionId, company, role, messages, signal } = opts;
 
   const userText = latestUserText(messages);
   const query = userText || "candidate background, experience, and the role requirements";
@@ -53,7 +54,7 @@ export async function interviewTurnResponse(opts: {
     return Response.json({ error: "retrieval failed" }, { status: 502 });
   }
 
-  const system = buildSystemPrompt({ company, docs });
+  const system = buildSystemPrompt({ company, role, docs });
   const convo: Msg[] = [{ role: "system", content: system }, ...sanitizeHistory(messages)];
   const phase = phaseForTurn(countAssistantTurns(messages));
 

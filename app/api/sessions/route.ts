@@ -31,6 +31,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const cv = form.get("cv");
   const jd = String(form.get("jd") ?? "").trim();
+  const role = String(form.get("role") ?? "").trim();
   const company = String(form.get("company") ?? "").trim();
   const companyUrl = String(form.get("companyUrl") ?? "").trim();
 
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (cv.size > MAX_CV_BYTES)
     return Response.json({ error: `CV must be under ${MAX_CV_MB}MB.` }, { status: 413 });
   if (!jd) return Response.json({ error: "Please paste the job description." }, { status: 400 });
+  if (!role) return Response.json({ error: "Please enter the role you're interviewing for." }, { status: 400 });
   if (!company) return Response.json({ error: "Please enter the company name." }, { status: 400 });
 
   let cvText: string;
@@ -64,10 +66,10 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const sessionId = randomUUID();
   try {
-    await createSession({ id: sessionId, company, companyUrl: companyUrl || undefined });
+    await createSession({ id: sessionId, company, companyUrl: companyUrl || undefined, role });
     await addSessionDocs(sessionId, [
       { kind: "cv", text: cvText },
-      { kind: "jd", text: jd },
+      { kind: "jd", text: `Role: ${role}\n\n${jd}` },
       ...(companyText ? [{ kind: "company", text: companyText }] : []),
     ]);
   } catch {
