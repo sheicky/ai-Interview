@@ -257,25 +257,27 @@ flowchart LR
 
 ## 8. RAG pipeline (minimal — for a quick walkthrough)
 
-The whole loop in one picture: **documents → Pinecone (store) → speech → Pinecone (retrieve) → grounded reply.** Pinecone is an *integrated* index, so it does the embedding itself (no separate model in our code).
+The whole loop in one picture: **embed & store → STT → vector search → grounded LLM → TTS.** Pinecone is an *integrated* index, so embedding runs server-side (no embedding model in our code).
 
 ```mermaid
 flowchart LR
   subgraph Ingest["① Setup — once per interview"]
-    Docs["CV + Job description"] --> API["/api/sessions"]
-    API --> PC[("Pinecone<br/>embeds + stores<br/>1 namespace per candidate")]
+    Docs["CV + JD (raw)"] --> Parse["PDF → text<br/>(unpdf)"]
+    Parse --> PC[("Pinecone integrated index<br/>embed: multilingual-e5-large · 1024-d<br/>cosine · namespace = session_id")]
   end
 
-  subgraph Turn["② Each spoken turn"]
-    Voice["Candidate speaks"] --> Q["Transcript = query"]
-    Q --> Search["Pinecone search<br/>same namespace"]
-    Search --> Top["Top snippets<br/>from CV / JD"]
-    Top --> Prompt["Interviewer prompt<br/>+ snippets"]
-    Prompt --> LLM["Claude<br/>via OpenRouter"]
-    LLM --> Reply["Grounded question<br/>spoken back"]
+  subgraph Turn["② Each spoken turn — WebRTC"]
+    Mic["Candidate audio"] --> STT["STT / ASR<br/>(ElevenLabs)"]
+    STT --> Q["query text"]
+    Q --> KNN["ANN vector search<br/>top-k = 5 · cosine<br/>(same namespace)"]
+    KNN --> Ctx["retrieved CV / JD chunks"]
+    Ctx --> Prompt["system prompt<br/>+ RAG context + history"]
+    Prompt --> LLM["LLM, streaming<br/>Claude via OpenRouter<br/>OpenAI-compatible SSE"]
+    LLM --> TTS["TTS<br/>(ElevenLabs)"]
+    TTS --> Spk["spoken reply"]
   end
 
-  PC -. retrieves from .-> Search
+  PC -. server-side embed + ANN retrieve .-> KNN
 ```
 
-**~50s narration:** A candidate's CV and the job description go to our API, which hands the text to Pinecone — it embeds and stores it, one namespace per candidate so résumés never mix. Then, on every spoken turn, the transcript becomes a search query; Pinecone returns the most relevant CV/JD snippets; those go into the interviewer prompt; Claude generates the next question grounded in them; and it's spoken back — always specific to this person and this role.
+**~50s narration:** At setup, the CV and job description are parsed to text and sent to Pinecone, which **embeds** them server-side (`multilingual-e5-large`, 1024-dim, cosine) and stores the vectors in a **per-session namespace**. During the call (over WebRTC), each turn the candidate's audio is transcribed by **STT**; that text is the query for an **approximate-nearest-neighbour search** (top-5) in their namespace; the retrieved CV/JD chunks are injected into the **system prompt** alongside the history; **Claude** streams the next question back as OpenAI-compatible SSE; and **TTS** speaks it — grounded in this exact résumé and role.
