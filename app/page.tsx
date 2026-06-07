@@ -120,8 +120,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     placeItems: "center",
     padding: "48px 24px",
-    background:
-      "radial-gradient(120% 80% at 50% -10%, var(--accent-soft) 0%, var(--bg) 46%)",
+    background: "var(--hero)",
     color: "var(--ink)",
   },
   shell: { width: "100%", maxWidth: 540 },
@@ -188,7 +187,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   button: {
     marginTop: 4,
-    background: "var(--accent)",
+    background: "var(--btn)",
     color: "#fff",
     border: "none",
     fontSize: 15,

@@ -1,26 +1,32 @@
 :root {
-  /* Surfaces — warm paper neutrals */
-  --bg: #f4f3ef;
-  --bg-tint: #eceae3;
+  /* Surfaces — warm paper neutrals (Hexa family) */
+  --bg: #f4f2ee;
+  --bg-tint: #ece8e0;
   --surface: #ffffff;
-  --ink: #17150f;
-  --muted: #6d685f;
-  --line: #e6e2d9;
+  --ink: #1a1410;
+  --muted: #6d655c;
+  --line: #e8e3d9;
 
-  /* One confident accent (solid, never gradient) */
-  --accent: #2f6df6;
-  --accent-press: #1f57d6;
-  --accent-soft: #edf2ff;
+  /* Warm accent (coral, derived from Hexa's pink->orange) for links, focus,
+     small highlights. Primary buttons are near-black pills (Hexa style). */
+  --accent: #fb6a3c;
+  --accent-press: #e2542a;
+  --accent-soft: #fff1ea;
+  --btn: #1a1014;
+  --btn-press: #000000;
   --danger: #cf4040;
   --ok-soft: #eef6ee;
+
+  /* Hexa hero wash — pink -> peach fading to the warm base */
+  --hero: radial-gradient(120% 85% at 50% -12%, #ffc9e6 0%, #ffd7c0 24%, var(--bg) 56%);
 
   /* Radius + depth */
   --radius-sm: 10px;
   --radius: 14px;
   --radius-lg: 24px;
-  --ring: 0 0 0 3px rgba(47, 109, 246, 0.28);
-  --shadow-sm: 0 1px 2px rgba(23, 21, 15, 0.05);
-  --shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 18px 40px -18px rgba(23, 21, 15, 0.18);
+  --ring: 0 0 0 3px rgba(251, 106, 60, 0.3);
+  --shadow-sm: 0 1px 2px rgba(26, 20, 16, 0.05);
+  --shadow: 0 1px 2px rgba(26, 20, 16, 0.04), 0 18px 40px -18px rgba(26, 20, 16, 0.18);
 
   --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
