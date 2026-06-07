@@ -44,3 +44,7 @@ brainstorm.md
 .gstack/
 .cs/
 .data/
+
+# personal drafts — not for the repo
+interview.md
+substack-article.md
