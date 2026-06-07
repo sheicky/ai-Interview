@@ -28,7 +28,7 @@
   --shadow-sm: 0 1px 2px rgba(26, 20, 16, 0.05);
   --shadow: 0 1px 2px rgba(26, 20, 16, 0.04), 0 18px 40px -18px rgba(26, 20, 16, 0.18);
 
-  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-geist-sans), ui-sans-serif, sans-serif;
   --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
@@ -58,6 +58,12 @@ body {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+}
+
+/* Headings use the display face; body/UI stays on Geist. */
+h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 a {
