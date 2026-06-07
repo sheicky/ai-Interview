@@ -38,7 +38,7 @@ const eyebrow: React.CSSProperties = {
   color: "var(--muted)",
 };
 const btnPrimary: React.CSSProperties = {
-  background: "var(--accent)",
+  background: "var(--btn)",
   color: "#fff",
   border: "none",
   borderRadius: 999,

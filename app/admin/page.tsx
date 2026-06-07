@@ -83,8 +83,7 @@ const gateWrap: React.CSSProperties = {
   placeItems: "center",
   color: "var(--ink)",
   padding: "2rem",
-  background:
-    "radial-gradient(120% 80% at 50% -10%, var(--accent-soft) 0%, var(--bg) 46%)",
+  background: "var(--hero)",
 };
 const gateCard: React.CSSProperties = {
   background: "var(--surface)",
@@ -116,7 +115,7 @@ const gateBtn: React.CSSProperties = {
   fontSize: "1rem",
   fontWeight: 600,
   color: "#fff",
-  background: "var(--accent)",
+  background: "var(--btn)",
   border: "none",
   borderRadius: 999,
   cursor: "pointer",
