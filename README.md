@@ -1,7 +1,7 @@
 # AI Interview
 
 Practice a real, role-specific job interview with an AI voice interviewer, then get a scored report.
-
+Video demo : https://www.loom.com/share/89ad497e32cb43009f222db8575e0abf
 ## How it works
 
 1. **Intake** (`/`) — upload your CV (PDF), paste the job description, name the company.
