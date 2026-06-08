@@ -17,7 +17,10 @@ import { buildReportPrompt, parseReport, type Report } from "@/lib/report";
 import type { Msg } from "@/lib/interviewer";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Report generation is a single (occasionally retried) ~20-40s LLM call. 60s left
+// no headroom for cold start + the corrective retry, so the function was getting
+// killed mid-generation in production. Vercel now permits up to 300s.
+export const maxDuration = 300;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

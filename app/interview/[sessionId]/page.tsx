@@ -73,22 +73,10 @@ function VoiceInterview() {
     } catch {
       /* ignore */
     }
-    try {
-      const res = await fetch("/api/report", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
-      if (!res.ok) {
-        setError("Could not generate the report.");
-        setPhase("live");
-        return;
-      }
-      router.push(`/report/${sessionId}`);
-    } catch {
-      setError("Could not generate the report.");
-      setPhase("live");
-    }
+    // Hand off to the report page, which generates the report on demand (with a
+    // loading state + retry). We deliberately don't hold the slow generation
+    // request open on this tab — that's what was timing out and losing reports.
+    router.push(`/report/${sessionId}`);
   }
 
   // Orb pulse: drive scale from the agent's output audio level while live.
